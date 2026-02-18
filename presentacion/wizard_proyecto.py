@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
     QWizardPage,
 )
 
-from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import AuditarProyectoGenerado
 from aplicacion.casos_uso.actualizar_manifest_patch import ActualizarManifestPatch
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.crear_plan_patch_desde_blueprints import CrearPlanPatchDesdeBlueprints

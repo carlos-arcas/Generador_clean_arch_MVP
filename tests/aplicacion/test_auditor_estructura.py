@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import AuditarProyectoGenerado
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
 
 

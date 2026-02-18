@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2] - 2026-02-18
+
+### Corregido
+- Eliminada duplicidad de módulo de auditoría.
+- Unificada fuente única de auditoría.
+
+
 ## [1.5.1] - 2026-02-18
 
 ### Corregido
