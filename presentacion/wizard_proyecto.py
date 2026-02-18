@@ -38,6 +38,7 @@ from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBluep
 from aplicacion.casos_uso.crear_plan_patch_desde_blueprints import CrearPlanPatchDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
+from aplicacion.casos_uso.presets import CargarPreset, GuardarPreset
 from aplicacion.casos_uso.gestion_clases import (
     AgregarAtributo,
     AgregarClase,
@@ -47,7 +48,15 @@ from aplicacion.casos_uso.gestion_clases import (
     ListarClases,
     ObtenerClaseDetallada,
 )
-from dominio.modelos import ErrorValidacionDominio, EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
+from dominio.modelos import (
+    ErrorValidacionDominio,
+    EspecificacionAtributo,
+    EspecificacionClase,
+    EspecificacionProyecto,
+    PresetProyecto,
+)
+from aplicacion.errores import ErrorAplicacion
+from infraestructura.almacen_presets_disco import AlmacenPresetsDisco
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
 from infraestructura.ejecutor_procesos_subprocess import EjecutorProcesosSubprocess
 from infraestructura.manifest_en_disco import EscritorManifestSeguro, LectorManifestEnDisco
@@ -121,10 +130,17 @@ class PaginaDatosProyecto(QWizardPage):
         ruta_layout.addWidget(self.ruta_destino)
         ruta_layout.addWidget(boton_ruta)
 
+        self.boton_guardar_preset = QPushButton("Guardar preset")
+        self.boton_cargar_preset = QPushButton("Cargar preset")
+        botones_presets = QHBoxLayout()
+        botones_presets.addWidget(self.boton_guardar_preset)
+        botones_presets.addWidget(self.boton_cargar_preset)
+
         layout.addRow("Nombre proyecto", self.nombre_proyecto)
         layout.addRow("Ruta destino", ruta_layout)
         layout.addRow("Descripción", self.descripcion)
         layout.addRow("Versión", self.version)
+        layout.addRow("Presets", botones_presets)
 
     def _seleccionar_directorio(self) -> None:
         carpeta = QFileDialog.getExistingDirectory(self, "Seleccionar ruta destino")
@@ -195,6 +211,9 @@ class PaginaClases(QWizardPage):
         LOGGER.error("Error en página de clases: %s", exc)
         LOGGER.debug("Stacktrace UI clases:\n%s", traceback.format_exc())
         QMessageBox.critical(self, "Error", str(exc))
+
+    def recargar_clases(self) -> None:
+        self._refrescar_modelos()
 
     def _refrescar_modelos(self) -> None:
         clases = self._listar_clases.ejecutar()
@@ -401,11 +420,16 @@ class WizardProyecto(QWizard):
                 version=version_generador,
             )
         )
+        self._guardar_preset = GuardarPreset(AlmacenPresetsDisco())
+        self._cargar_preset = CargarPreset(AlmacenPresetsDisco())
 
         self.pagina_datos = PaginaDatosProyecto()
         self.pagina_clases = PaginaClases(self._repositorio_estado)
         self.pagina_blueprints = PaginaBlueprints()
         self.pagina_resumen = PaginaResumen(self)
+
+        self.pagina_datos.boton_guardar_preset.clicked.connect(self._on_guardar_preset)
+        self.pagina_datos.boton_cargar_preset.clicked.connect(self._on_cargar_preset)
 
         self.addPage(self.pagina_datos)
         self.addPage(self.pagina_clases)
@@ -450,6 +474,57 @@ class WizardProyecto(QWizard):
         estado.validar()
         self._repositorio_estado.guardar(estado)
         return estado
+
+
+    def _construir_preset_actual(self, nombre_preset: str) -> PresetProyecto:
+        especificacion = self._actualizar_especificacion_desde_formulario()
+        return PresetProyecto(
+            nombre_preset=nombre_preset,
+            especificacion=especificacion,
+            blueprints=self.pagina_blueprints.blueprints_seleccionados(),
+            opciones={"origen": "wizard_pyside6"},
+        )
+
+    def _on_guardar_preset(self) -> None:
+        nombre, aceptado = QInputDialog.getText(self, "Guardar preset", "Nombre del preset")
+        if not aceptado:
+            return
+        try:
+            preset = self._construir_preset_actual(nombre.strip())
+            ruta = self._guardar_preset.ejecutar(preset, incluir_ruta_destino=False)
+            QMessageBox.information(self, "Preset guardado", f"Preset guardado en:\n{ruta}")
+        except (ErrorValidacionDominio, ErrorAplicacion, ValueError) as exc:
+            QMessageBox.critical(self, "Error al guardar preset", str(exc))
+
+    def _on_cargar_preset(self) -> None:
+        ruta, _ = QFileDialog.getOpenFileName(
+            self,
+            "Cargar preset",
+            "configuracion/presets",
+            "JSON (*.json)",
+        )
+        if not ruta:
+            return
+        try:
+            preset = self._cargar_preset.ejecutar(ruta)
+            self.pagina_datos.nombre_proyecto.setText(preset.especificacion.nombre_proyecto)
+            self.pagina_datos.descripcion.setText(preset.especificacion.descripcion or "")
+            self.pagina_datos.version.setText(preset.especificacion.version)
+            if preset.especificacion.ruta_destino:
+                self.pagina_datos.ruta_destino.setText(preset.especificacion.ruta_destino)
+            self._repositorio_estado.guardar(preset.especificacion)
+            self.pagina_clases.recargar_clases()
+            self._aplicar_blueprints_preset(preset.blueprints)
+            QMessageBox.information(self, "Preset cargado", "Preset cargado correctamente.")
+        except (ErrorValidacionDominio, ErrorAplicacion, FileNotFoundError, ValueError) as exc:
+            QMessageBox.critical(self, "Error al cargar preset", str(exc))
+
+    def _aplicar_blueprints_preset(self, blueprints: list[str]) -> None:
+        self.pagina_blueprints.persistencia_sqlite.setChecked("crud_sqlite" in blueprints)
+        self.pagina_blueprints.persistencia_json.setChecked("crud_sqlite" not in blueprints)
+        self.pagina_blueprints.informe_csv.setChecked("export_csv" in blueprints)
+        self.pagina_blueprints.informe_excel.setChecked("export_excel" in blueprints)
+        self.pagina_blueprints.informe_pdf.setChecked("export_pdf" in blueprints)
 
     def _set_controles_habilitados(self, habilitado: bool) -> None:
         self.button(QWizard.NextButton).setEnabled(habilitado)

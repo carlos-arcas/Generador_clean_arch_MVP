@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
+from aplicacion.errores import ErrorBlueprintNoEncontrado
 from aplicacion.puertos.blueprint import Blueprint, RepositorioBlueprints
 
 
@@ -35,7 +36,7 @@ class RepositorioBlueprintsEnDisco(RepositorioBlueprints):
         for blueprint in self.listar_blueprints():
             if blueprint.nombre() == nombre:
                 return blueprint
-        raise ValueError(f"Blueprint no encontrado: {nombre}")
+        raise ErrorBlueprintNoEncontrado(f"Blueprint no encontrado: {nombre}")
 
     def _resolver_clase_blueprint(self, modulo: str) -> type[Blueprint] | None:
         modulo_obj = importlib.import_module(modulo)
