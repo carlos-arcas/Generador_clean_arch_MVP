@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from bootstrap.composition_root import crear_contenedor
+from infraestructura.bootstrap import construir_contenedor_aplicacion
 
 
-def test_crear_contenedor_expone_casos_de_uso_principales() -> None:
-    contenedor = crear_contenedor()
+def test_construir_contenedor_aplicacion_expone_casos_de_uso_principales() -> None:
+    contenedor = construir_contenedor_aplicacion()
 
     assert contenedor.generar_proyecto_mvp is not None
     assert contenedor.auditar_proyecto_generado is not None
@@ -19,13 +19,14 @@ def test_crear_contenedor_expone_casos_de_uso_principales() -> None:
     assert contenedor.guardar_credencial is not None
 
 
-def test_cli_no_importa_infraestructura_directamente() -> None:
+def test_cli_importa_solo_bootstrap_de_infraestructura() -> None:
     contenido = Path("presentacion/cli/__main__.py").read_text(encoding="utf-8")
 
-    assert "infraestructura." not in contenido
+    assert "from infraestructura.bootstrap import" in contenido
 
 
 def test_wizard_no_importa_infraestructura_directamente() -> None:
     contenido = Path("presentacion/wizard/wizard_generador.py").read_text(encoding="utf-8")
 
-    assert "infraestructura." not in contenido
+    assert "from infraestructura." not in contenido
+    assert "import infraestructura" not in contenido

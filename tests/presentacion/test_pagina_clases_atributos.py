@@ -12,7 +12,21 @@ QtWidgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 QApplication = QtWidgets.QApplication
 QMessageBox = QtWidgets.QMessageBox
 
+from infraestructura.bootstrap import construir_contenedor_aplicacion
 from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
+
+
+def crear_wizard(**sobrescrituras):
+    contenedor = construir_contenedor_aplicacion()
+    dependencias = {
+        "generar_proyecto": contenedor.generar_proyecto_mvp,
+        "guardar_preset": contenedor.guardar_preset_proyecto,
+        "cargar_preset": contenedor.cargar_preset_proyecto,
+        "guardar_credencial": contenedor.guardar_credencial,
+        "catalogo_blueprints": contenedor.catalogo_blueprints,
+    }
+    dependencias.update(sobrescrituras)
+    return WizardGeneradorProyectos(**dependencias)
 
 
 @pytest.fixture
@@ -26,7 +40,7 @@ def app_qt() -> QApplication:
 @pytest.fixture
 def wizard(app_qt: QApplication, monkeypatch: pytest.MonkeyPatch) -> WizardGeneradorProyectos:
     monkeypatch.setattr(QMessageBox, "critical", lambda *args, **kwargs: QMessageBox.Ok)
-    return WizardGeneradorProyectos()
+    return crear_wizard()
 
 
 def test_anadir_clase_valida(wizard: WizardGeneradorProyectos) -> None:

@@ -13,6 +13,7 @@ QApplication = QtWidgets.QApplication
 QMessageBox = QtWidgets.QMessageBox
 
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvpSalida
+from infraestructura.bootstrap import construir_contenedor_aplicacion
 from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
 
 
@@ -31,6 +32,19 @@ class GeneradorMvpDoble:
         )
 
 
+def crear_wizard(**sobrescrituras):
+    contenedor = construir_contenedor_aplicacion()
+    dependencias = {
+        "generar_proyecto": contenedor.generar_proyecto_mvp,
+        "guardar_preset": contenedor.guardar_preset_proyecto,
+        "cargar_preset": contenedor.cargar_preset_proyecto,
+        "guardar_credencial": contenedor.guardar_credencial,
+        "catalogo_blueprints": contenedor.catalogo_blueprints,
+    }
+    dependencias.update(sobrescrituras)
+    return WizardGeneradorProyectos(**dependencias)
+
+
 @pytest.fixture
 def app_qt() -> QApplication:
     app = QApplication.instance()
@@ -44,7 +58,7 @@ def test_wizard_finalizar_dispara_caso_uso_y_bloquea_botones(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     generador_doble = GeneradorMvpDoble()
-    wizard = WizardGeneradorProyectos(generador_mvp=generador_doble)
+    wizard = crear_wizard(generar_proyecto=generador_doble)
     wizard.pagina_datos.campo_nombre.setText("MiProyecto")
     wizard.pagina_datos.campo_ruta.setText("/tmp/mi_proyecto")
     wizard.pagina_clases.anadir_clase("Cliente")
