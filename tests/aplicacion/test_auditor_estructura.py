@@ -21,7 +21,7 @@ def _crear_base_valida(base: Path) -> None:
     (base / "scripts").mkdir(parents=True)
     (base / "logs").mkdir(parents=True)
     (base / "docs").mkdir(parents=True)
-    (base / "VERSION").write_text("0.6.0", encoding="utf-8")
+    (base / "VERSION").write_text("0.7.0", encoding="utf-8")
     (base / "CHANGELOG.md").write_text("# CHANGELOG", encoding="utf-8")
     (base / "infraestructura" / "logging_config.py").write_text("def configurar_logging(): pass", encoding="utf-8")
     (base / "logs" / "seguimiento.log").write_text("", encoding="utf-8")

@@ -15,6 +15,7 @@ from aplicacion.casos_uso.auditar_proyecto_generado import ResultadoAuditoria
 from dominio.modelos import EspecificacionProyecto
 from presentacion.trabajadores.trabajador_generacion import ResultadoGeneracion, TrabajadorGeneracion
 from presentacion.ventana_principal import VentanaPrincipal
+from presentacion.wizard_proyecto import PaginaBlueprints
 
 
 
@@ -27,7 +28,7 @@ def _app() -> QApplication:
 
 def test_instanciar_ventana_principal() -> None:
     _app()
-    ventana = VentanaPrincipal(version_generador="0.6.0")
+    ventana = VentanaPrincipal(version_generador="0.7.0")
 
     assert ventana.windowTitle() == "Generador Base Proyectos"
     assert ventana.wizard is not None
@@ -38,7 +39,7 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
         nombre_proyecto="demo",
         ruta_destino="salida/demo",
         descripcion="demo",
-        version="0.6.0",
+        version="0.7.0",
     )
     mock_plan = object()
 
@@ -57,7 +58,7 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
         crear_plan_desde_blueprints=crear_plan,
         ejecutar_plan=ejecutar_plan,
         auditor=auditor,
-        version_generador="0.6.0",
+        version_generador="0.7.0",
     )
 
     eventos_finalizados: list[ResultadoGeneracion] = []
@@ -73,3 +74,15 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
     )
     assert eventos_finalizados
     assert eventos_finalizados[0].auditoria.valido is True
+
+
+def test_pagina_blueprints_persistencia_exclusiva() -> None:
+    _app()
+    pagina = PaginaBlueprints()
+
+    assert pagina.blueprints_seleccionados() == ["base_clean_arch", "crud_json"]
+
+    pagina.persistencia_sqlite.setChecked(True)
+
+    assert pagina.blueprints_seleccionados() == ["base_clean_arch", "crud_sqlite"]
+    assert pagina.persistencia_json.isChecked() is False

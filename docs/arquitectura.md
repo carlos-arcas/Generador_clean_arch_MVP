@@ -68,6 +68,14 @@ Relación permitida:
 - La persistencia se limita a infraestructura: dominio y aplicación no conocen JSON.
 - Se genera `datos/<entidad_plural>.json` por entidad y `datos/.gitkeep` para asegurar la carpeta en el proyecto.
 
+
+## Persistencia intercambiable JSON/SQLite (v0.7.0)
+- Se añade `crud_sqlite_v1` (`crud_sqlite@1.0.0`) para generar la misma API de dominio/aplicación que `crud_json`, cambiando únicamente el adaptador de infraestructura.
+- Repositorios SQLite se ubican en `infraestructura/persistencia/sqlite` y usan `sqlite3` estándar con conexión por operación.
+- El repositorio crea tabla automáticamente (`CREATE TABLE IF NOT EXISTS`) en `datos/base_datos.db`.
+- El wizard expone selección exclusiva de persistencia (JSON o SQLite), evitando combinaciones ambiguas de blueprints.
+- La intercambiabilidad se garantiza por puertos: los casos de uso solo dependen de `Repositorio<Entidad>`.
+
 ## Capa de presentación PySide6 (v0.5.0)
 - `presentacion/ventana_principal.py` aloja el wizard y no contiene reglas de negocio.
 - `presentacion/wizard_proyecto.py` solo coordina casos de uso (`gestion_clases`, `CrearPlanDesdeBlueprints`, `EjecutarPlan`, `AuditarProyectoGenerado`).
@@ -86,7 +94,7 @@ Este flujo evita bloqueo de interfaz y mantiene dependencia hacia adentro: la UI
 ## Auditor avanzado (v0.6.0)
 - `aplicacion/casos_uso/auditar_proyecto_generado.py` evoluciona a auditoría integral con cuatro bloques:
   1. Estructura obligatoria del proyecto generado.
-  2. Reglas de arquitectura por imports (prohibiciones por capa y ciclo básico).
+  2. Reglas de arquitectura por imports (prohibiciones por capa y ciclo básico), incluyendo `sqlite3` exclusivo de infraestructura.
   3. Verificación de logging (`infraestructura/logging_config.py`, `logs/seguimiento.log`, `logs/crashes.log`).
   4. Ejecución de `pytest --cov=. --cov-report=term` y validación de cobertura >= 85%.
 - La ejecución de comandos se abstrae con el puerto `EjecutorProcesos`, implementado por `infraestructura/ejecutor_procesos_subprocess.py`.

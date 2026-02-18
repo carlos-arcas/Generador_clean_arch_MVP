@@ -9,6 +9,7 @@ def test_listar_blueprints_carga_blueprint_base() -> None:
     nombres = [blueprint.nombre() for blueprint in blueprints]
     assert "base_clean_arch" in nombres
     assert "crud_json" in nombres
+    assert "crud_sqlite" in nombres
 
 
 def test_obtener_por_nombre_retorna_blueprint() -> None:

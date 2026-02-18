@@ -2,6 +2,17 @@
 
 Todos los cambios importantes de este proyecto se documentan en este archivo.
 
+## [0.7.0] - 2026-02-18
+### Agregado
+- Nuevo blueprint `crud_sqlite_v1` (`crud_sqlite@1.0.0`) con repositorios SQLite por entidad en `infraestructura/persistencia/sqlite`.
+- Repositorios SQLite generados con `sqlite3` estándar, creación de tabla automática, conexión por operación y logging de CRUD/errores SQL.
+- Pruebas de blueprint e intercambiabilidad para validar reemplazo JSON ↔ SQLite sin cambios en dominio/aplicación.
+- Validación adicional en auditor para detectar `sqlite3` fuera de `infraestructura`.
+- Selección exclusiva de persistencia (JSON o SQLite) en la página de blueprints del wizard.
+
+### Cambiado
+- Versión del generador actualizada a `0.7.0`.
+
 ## [0.6.0] - 2026-02-18
 ### Agregado
 - Auditor avanzado de proyectos generados con validación de estructura, imports prohibidos, ciclos básicos y reglas de logging.

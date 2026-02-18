@@ -61,3 +61,19 @@ La ejecución de procesos se modela como puerto (`EjecutorProcesos`) con impleme
 - preservar inversión de dependencias en Clean Architecture,
 - permitir pruebas unitarias del auditor con mocks de cobertura 90%/70% sin lanzar `pytest` real,
 - aislar detalles de `subprocess` fuera de la capa de aplicación.
+
+
+## Persistencia SQLite sin ORM externo (v0.7.0)
+Se adopta `sqlite3` del estándar de Python para el blueprint `crud_sqlite` en lugar de un ORM. Motivos:
+- cero dependencias adicionales en el generador y en proyectos generados,
+- control explícito sobre SQL emitido para auditoría y trazabilidad,
+- alineación con el objetivo didáctico de Clean Architecture (puertos + adaptadores concretos).
+
+## Conexión SQLite por operación
+Los repositorios SQLite abren conexión en cada operación CRUD usando context manager (`with sqlite3.connect(...)`). Motivos:
+- simplicidad operacional y menor estado compartido,
+- cierre determinista incluso ante excepciones,
+- menor riesgo de fugas de conexión en artefactos generados.
+
+## Intercambiabilidad real por puertos de aplicación
+JSON y SQLite implementan el mismo puerto `Repositorio<Entidad>`. Los casos de uso y entidades se conservan idénticos entre blueprints de persistencia. Esto permite cambiar de adaptador sin modificar dominio ni aplicación, cumpliendo inversión de dependencias de Clean Architecture.

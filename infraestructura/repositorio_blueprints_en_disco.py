@@ -40,6 +40,11 @@ class RepositorioBlueprintsEnDisco(RepositorioBlueprints):
     def _resolver_clase_blueprint(self, modulo: str) -> type[Blueprint] | None:
         modulo_obj = importlib.import_module(modulo)
         for atributo in vars(modulo_obj).values():
-            if isinstance(atributo, type) and issubclass(atributo, Blueprint) and atributo is not Blueprint:
+            if (
+                isinstance(atributo, type)
+                and issubclass(atributo, Blueprint)
+                and atributo is not Blueprint
+                and atributo.__module__ == modulo
+            ):
                 return atributo
         return None
