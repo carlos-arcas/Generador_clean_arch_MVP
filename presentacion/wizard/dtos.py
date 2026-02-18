@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from dominio.modelos import EspecificacionProyecto
+from aplicacion.dtos.proyecto import DtoProyectoEntrada
 
 
 @dataclass(frozen=True)
@@ -15,7 +15,7 @@ class DatosWizardProyecto:
     ruta: str
     descripcion: str
     version: str
-    especificacion_proyecto: EspecificacionProyecto
+    proyecto: DtoProyectoEntrada
     persistencia: str
     usuario_credencial: str = ""
     secreto_credencial: str = field(default="", repr=False)

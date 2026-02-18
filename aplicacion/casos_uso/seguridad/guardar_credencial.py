@@ -15,3 +15,13 @@ class GuardarCredencial:
 
     def ejecutar(self, credencial: Credencial) -> None:
         self._repositorio.guardar(credencial)
+
+    def ejecutar_desde_datos(self, *, identificador: str, usuario: str, secreto: str, tipo: str) -> None:
+        self.ejecutar(
+            Credencial(
+                identificador=identificador,
+                usuario=usuario,
+                secreto=secreto,
+                tipo=tipo,
+            )
+        )

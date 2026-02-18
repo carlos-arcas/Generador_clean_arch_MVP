@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWizard,
 )
 
+from aplicacion.casos_uso.construir_especificacion_proyecto import ConstruirEspecificacionProyecto
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
@@ -21,9 +22,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
 )
 from aplicacion.casos_uso.presets import CargarPresetProyecto, GuardarPresetProyecto
 from aplicacion.casos_uso.seguridad import GuardarCredencial
-from dominio.modelos import EspecificacionProyecto
-from dominio.seguridad import Credencial
-from dominio.preset.preset_proyecto import PresetProyecto
+from aplicacion.dtos.proyecto import DtoAtributo, DtoClase, DtoProyectoEntrada
 from presentacion.wizard.dtos import DatosWizardProyecto
 from presentacion.wizard.paginas.pagina_clases import PaginaClases
 from presentacion.wizard.paginas.pagina_datos_proyecto import PaginaDatosProyecto
@@ -40,16 +39,19 @@ class ControladorWizardProyecto:
     """Orquesta la recopilación de datos del wizard para siguientes pasos."""
 
     def construir_dto(self, wizard: "WizardGeneradorProyectos") -> DatosWizardProyecto:
-        wizard.especificacion_proyecto.nombre_proyecto = wizard.pagina_datos.campo_nombre.text().strip()
-        wizard.especificacion_proyecto.ruta_destino = wizard.pagina_datos.campo_ruta.text().strip()
-        wizard.especificacion_proyecto.descripcion = wizard.pagina_datos.campo_descripcion.text().strip()
-        wizard.especificacion_proyecto.version = wizard.pagina_datos.campo_version.text().strip()
-        return DatosWizardProyecto(
-            nombre=wizard.pagina_datos.campo_nombre.text().strip(),
-            ruta=wizard.pagina_datos.campo_ruta.text().strip(),
+        proyecto = DtoProyectoEntrada(
+            nombre_proyecto=wizard.pagina_datos.campo_nombre.text().strip(),
+            ruta_destino=wizard.pagina_datos.campo_ruta.text().strip(),
             descripcion=wizard.pagina_datos.campo_descripcion.text().strip(),
             version=wizard.pagina_datos.campo_version.text().strip(),
-            especificacion_proyecto=wizard.especificacion_proyecto,
+            clases=wizard.pagina_clases.dto_clases(),
+        )
+        return DatosWizardProyecto(
+            nombre=proyecto.nombre_proyecto,
+            ruta=proyecto.ruta_destino,
+            descripcion=proyecto.descripcion,
+            version=proyecto.version,
+            proyecto=proyecto,
             persistencia=wizard.pagina_persistencia.persistencia_seleccionada(),
             usuario_credencial=wizard.pagina_persistencia.usuario_credencial(),
             secreto_credencial=wizard.pagina_persistencia.secreto_credencial(),
@@ -100,8 +102,7 @@ class WizardGeneradorProyectos(QWizard):
         self._cargar_preset = cargar_preset
         self._guardar_credencial = guardar_credencial
         self._catalogo_blueprints = catalogo_blueprints
-
-        self.especificacion_proyecto = EspecificacionProyecto(nombre_proyecto="", ruta_destino="")
+        self._constructor_especificacion = ConstruirEspecificacionProyecto()
 
         self.pagina_datos = PaginaDatosProyecto()
         self.pagina_clases = PaginaClases()
@@ -146,13 +147,11 @@ class WizardGeneradorProyectos(QWizard):
         if dto.guardar_credencial and dto.usuario_credencial and dto.secreto_credencial:
             identificador = f"generador:{dto.nombre}:{dto.persistencia.lower()}"
             try:
-                self._guardar_credencial.ejecutar(
-                    Credencial(
-                        identificador=identificador,
-                        usuario=dto.usuario_credencial,
-                        secreto=dto.secreto_credencial,
-                        tipo=dto.persistencia,
-                    )
+                self._guardar_credencial.ejecutar_desde_datos(
+                    identificador=identificador,
+                    usuario=dto.usuario_credencial,
+                    secreto=dto.secreto_credencial,
+                    tipo=dto.persistencia,
                 )
                 LOGGER.info("Credencial almacenada de forma segura para identificador=%s", identificador)
             except Exception as exc:  # noqa: BLE001
@@ -166,8 +165,14 @@ class WizardGeneradorProyectos(QWizard):
                     "No se pudo guardar la credencial en el sistema seguro. Se usará únicamente en memoria durante esta ejecución.",
                 )
 
+        try:
+            especificacion = self._constructor_especificacion.ejecutar(dto.proyecto)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Error de validación", str(exc))
+            return
+
         entrada = GenerarProyectoMvpEntrada(
-            especificacion_proyecto=dto.especificacion_proyecto,
+            especificacion_proyecto=especificacion,
             ruta_destino=dto.ruta,
             nombre_proyecto=dto.nombre,
             blueprints=self._blueprints_seleccionados(),
@@ -192,14 +197,13 @@ class WizardGeneradorProyectos(QWizard):
             return
 
         try:
-            self._sincronizar_especificacion_desde_campos()
-            preset = PresetProyecto(
+            dto = self._controlador.construir_dto(self)
+            ruta = self._guardar_preset.ejecutar_desde_dto(
                 nombre=nombre,
-                especificacion=self.especificacion_proyecto,
+                proyecto=dto.proyecto,
                 blueprints=self._blueprints_seleccionados(),
                 metadata={"persistencia": self.pagina_persistencia.persistencia_seleccionada()},
             )
-            ruta = self._guardar_preset.ejecutar(preset)
             QMessageBox.information(self, "Guardar preset", f"Preset guardado en: {ruta}")
         except Exception as exc:  # noqa: BLE001
             LOGGER.error("No se pudo guardar preset: %s", exc)
@@ -227,18 +231,31 @@ class WizardGeneradorProyectos(QWizard):
             LOGGER.error("No se pudo cargar preset: %s", exc)
             QMessageBox.critical(self, "Cargar preset", str(exc))
 
-    def aplicar_preset(self, preset: PresetProyecto) -> None:
-        self.especificacion_proyecto = preset.especificacion
-        self.pagina_datos.campo_nombre.setText(preset.especificacion.nombre_proyecto)
-        self.pagina_datos.campo_ruta.setText(preset.especificacion.ruta_destino)
-        self.pagina_datos.campo_descripcion.setText(preset.especificacion.descripcion or "")
-        self.pagina_datos.campo_version.setText(preset.especificacion.version)
-        persistencia = str(preset.metadata.get("persistencia", "JSON"))
+    def aplicar_preset(self, preset: object) -> None:
+        especificacion = getattr(preset, "especificacion")
+        self.pagina_datos.campo_nombre.setText(getattr(especificacion, "nombre_proyecto", ""))
+        self.pagina_datos.campo_ruta.setText(getattr(especificacion, "ruta_destino", ""))
+        self.pagina_datos.campo_descripcion.setText(getattr(especificacion, "descripcion", "") or "")
+        self.pagina_datos.campo_version.setText(getattr(especificacion, "version", "0.1.0"))
+        persistencia = str(getattr(preset, "metadata", {}).get("persistencia", "JSON"))
         self.pagina_persistencia.establecer_persistencia(persistencia)
-        self.pagina_clases.establecer_desde_especificacion(self.especificacion_proyecto)
+
+        clases = []
+        for clase in getattr(especificacion, "clases", []):
+            atributos = [
+                DtoAtributo(
+                    nombre=atributo.nombre,
+                    tipo=atributo.tipo,
+                    obligatorio=atributo.obligatorio,
+                )
+                for atributo in getattr(clase, "atributos", [])
+            ]
+            clases.append(DtoClase(nombre=clase.nombre, atributos=atributos))
+        self.pagina_clases.establecer_desde_dto(clases)
+
         self.pagina_persistencia.establecer_blueprints_disponibles(
             self._catalogo_blueprints,
-            preset.blueprints,
+            getattr(preset, "blueprints", []),
         )
         self.pagina_resumen.initializePage()
 
@@ -247,12 +264,6 @@ class WizardGeneradorProyectos(QWizard):
         if seleccionados:
             return seleccionados
         return BLUEPRINTS_MVP
-
-    def _sincronizar_especificacion_desde_campos(self) -> None:
-        self.especificacion_proyecto.nombre_proyecto = self.pagina_datos.campo_nombre.text().strip()
-        self.especificacion_proyecto.ruta_destino = self.pagina_datos.campo_ruta.text().strip()
-        self.especificacion_proyecto.descripcion = self.pagina_datos.campo_descripcion.text().strip()
-        self.especificacion_proyecto.version = self.pagina_datos.campo_version.text().strip()
 
     def _actualizar_estado(self, texto: str) -> None:
         self._etiqueta_estado.setText(texto)
