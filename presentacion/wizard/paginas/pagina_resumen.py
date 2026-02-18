@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QTextEdit, QVBoxLayout, QWizardPage
 
+from presentacion.wizard.modelos.modelo_clases_temporal import ClaseTemporal
+
 
 class PaginaResumen(QWizardPage):
     """Renderiza un resumen textual de la configuración actual."""
@@ -30,7 +32,7 @@ class PaginaResumen(QWizardPage):
             ruta=wizard.pagina_datos.campo_ruta.text().strip(),
             descripcion=wizard.pagina_datos.campo_descripcion.text().strip(),
             version=wizard.pagina_datos.campo_version.text().strip(),
-            clases=wizard.pagina_clases.clases(),
+            clases=wizard.pagina_clases.clases_temporales(),
             persistencia=wizard.pagina_persistencia.persistencia_seleccionada(),
         )
         self._texto_resumen.setPlainText(texto)
@@ -42,10 +44,10 @@ class PaginaResumen(QWizardPage):
         ruta: str,
         descripcion: str,
         version: str,
-        clases: list[str],
+        clases: list[ClaseTemporal],
         persistencia: str,
     ) -> str:
-        listado_clases = "\n".join(f"- {clase}" for clase in clases) or "- (sin clases)"
+        listado_clases = self._construir_bloque_clases(clases)
         return (
             f"Nombre proyecto: {nombre}\n"
             f"Ruta destino: {ruta}\n"
@@ -58,3 +60,22 @@ class PaginaResumen(QWizardPage):
 
     def texto_resumen(self) -> str:
         return self._texto_resumen.toPlainText()
+
+    def _construir_bloque_clases(self, clases: list[ClaseTemporal]) -> str:
+        if not clases:
+            return "- (sin clases)"
+
+        bloques: list[str] = []
+        for clase in clases:
+            bloques.append(f"Clase: {clase.nombre}")
+            if not clase.atributos:
+                bloques.append("  - (sin atributos)")
+                continue
+
+            for atributo in clase.atributos:
+                texto = f"  - {atributo.nombre}: {atributo.tipo}"
+                if atributo.obligatorio:
+                    texto += " (obligatorio)"
+                bloques.append(texto)
+
+        return "\n".join(bloques)
