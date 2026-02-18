@@ -6,6 +6,10 @@
 - UX de generación con progreso por etapas.
 - Cancelación segura.
 - Mensajes de resultado mejorados.
+## [1.5.2] - 2026-02-18
+
+### Añadido
+- Test de integración completo del generador MVP.
 
 
 ## [1.5.1] - 2026-02-18
