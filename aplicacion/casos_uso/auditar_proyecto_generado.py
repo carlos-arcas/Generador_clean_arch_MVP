@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import hashlib
 import json
 import logging
 from pathlib import Path
 import re
 
 from aplicacion.errores import ErrorAuditoria
+from aplicacion.puertos.calculadora_hash_puerto import CalculadoraHashPuerto
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos
-from infraestructura.calculadora_hash_real import CalculadoraHashReal
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,6 +34,17 @@ class ResultadoComando:
     stderr: str
 
 
+class _CalculadoraHashLocal:
+    """Fallback temporal para evitar dependencia directa de infraestructura."""
+
+    def calcular_hash_archivo(self, ruta: Path) -> str:
+        digestor = hashlib.sha256()
+        with open(ruta, "rb") as archivo:
+            for bloque in iter(lambda: archivo.read(8192), b""):
+                digestor.update(bloque)
+        return digestor.hexdigest()
+
+
 class AuditarProyectoGenerado:
     """Verifica reglas de calidad para el proyecto generado."""
 
@@ -49,9 +61,13 @@ class AuditarProyectoGenerado:
         "CHANGELOG.md",
     ]
 
-    def __init__(self, ejecutor_procesos: EjecutorProcesos) -> None:
+    def __init__(
+        self,
+        ejecutor_procesos: EjecutorProcesos,
+        calculadora_hash: CalculadoraHashPuerto | None = None,
+    ) -> None:
         self._ejecutor_procesos = ejecutor_procesos
-        self._calculadora_hash = CalculadoraHashReal()
+        self._calculadora_hash = calculadora_hash or _CalculadoraHashLocal()
 
     def ejecutar(self, ruta_proyecto: str, blueprints_usados: list[str] | None = None) -> ResultadoAuditoria:
         """Ejecuta las validaciones obligatorias sobre un proyecto ya generado."""
@@ -205,7 +221,7 @@ class AuditarProyectoGenerado:
             if not ruta_archivo.exists():
                 errores.append(f"manifest.json referencia archivo inexistente: {ruta_relativa}")
                 continue
-            hash_actual = self._calculadora_hash.calcular_sha256(str(ruta_archivo))
+            hash_actual = self._calculadora_hash.calcular_hash_archivo(ruta_archivo)
             if hash_actual != hash_esperado:
                 errores.append(f"Hash inconsistente para {ruta_relativa} en manifest.json")
         return errores

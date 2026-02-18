@@ -18,6 +18,7 @@ from aplicacion.casos_uso.generar_manifest import GenerarManifest
 from dominio.excepciones.proyecto_ya_existe_error import ProyectoYaExisteError
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
+from infraestructura.manifest.generador_manifest import GeneradorManifest
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
 
@@ -52,6 +53,7 @@ def _crear_caso_uso() -> GenerarProyectoMvp:
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlan(sistema_archivos, GenerarManifest(CalculadoraHashReal())),
         sistema_archivos=sistema_archivos,
+        generador_manifest=GeneradorManifest(),
     )
 
 

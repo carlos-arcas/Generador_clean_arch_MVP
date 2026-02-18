@@ -13,6 +13,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
+from infraestructura.manifest.generador_manifest import GeneradorManifest
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
 
@@ -37,6 +38,7 @@ def test_generar_proyecto_mvp_crea_estructura_minima(tmp_path: Path) -> None:
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlan(sistema_archivos, generar_manifest),
         sistema_archivos=sistema_archivos,
+        generador_manifest=GeneradorManifest(),
     )
 
     salida = caso_uso.ejecutar(
