@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from aplicacion.dtos.proyecto import DtoProyectoEntrada
 from aplicacion.errores import ErrorValidacion
-from dominio.modelos import ErrorValidacionDominio, EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
+from dominio.especificacion import (
+    ErrorValidacionDominio,
+    EspecificacionAtributo,
+    EspecificacionClase,
+    EspecificacionProyecto,
+)
 
 
 class ConstruirEspecificacionProyecto:

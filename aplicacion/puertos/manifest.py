@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from dominio.modelos import ManifestProyecto
+from dominio.manifest import ManifestProyecto
 
 
 class LectorManifest(ABC):

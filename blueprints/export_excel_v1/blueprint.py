@@ -6,7 +6,8 @@ from dataclasses import dataclass
 import textwrap
 
 from aplicacion.puertos.blueprint import Blueprint
-from dominio.modelos import ArchivoGenerado, EspecificacionClase, EspecificacionProyecto, ErrorValidacionDominio, PlanGeneracion
+from dominio.especificacion import EspecificacionClase, EspecificacionProyecto, ErrorValidacionDominio
+from dominio.plan_generacion import ArchivoGenerado, PlanGeneracion
 
 
 @dataclass(frozen=True)

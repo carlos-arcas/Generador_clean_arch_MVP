@@ -8,7 +8,8 @@ from pathlib import Path
 
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.puertos.manifest import LectorManifest
-from dominio.modelos import EspecificacionProyecto, ErrorValidacionDominio, PlanGeneracion
+from dominio.especificacion import EspecificacionProyecto, ErrorValidacionDominio
+from dominio.plan_generacion import PlanGeneracion
 
 LOGGER = logging.getLogger(__name__)
 

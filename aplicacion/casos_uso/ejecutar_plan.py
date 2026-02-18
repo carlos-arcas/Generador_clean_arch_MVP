@@ -8,7 +8,7 @@ from typing import Any
 
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
 from aplicacion.puertos.sistema_archivos import SistemaArchivos
-from dominio.modelos import PlanGeneracion
+from dominio.plan_generacion import PlanGeneracion
 
 LOGGER = logging.getLogger(__name__)
 

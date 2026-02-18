@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 
 from aplicacion.puertos.manifest import EscritorManifest, LectorManifest
-from dominio.modelos import EntradaManifest, ManifestProyecto
+from dominio.manifest import EntradaManifest, ManifestProyecto
 
 
 class LectorManifestEnDisco(LectorManifest):

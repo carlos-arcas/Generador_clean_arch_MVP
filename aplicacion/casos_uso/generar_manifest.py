@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from aplicacion.puertos.calculadora_hash import CalculadoraHash
-from dominio.modelos import EntradaManifest, ManifestProyecto, PlanGeneracion
+from dominio.manifest import EntradaManifest, ManifestProyecto
+from dominio.plan_generacion import PlanGeneracion
 
 LOGGER = logging.getLogger(__name__)
 

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from dominio.modelos import EspecificacionProyecto, PlanGeneracion
+from dominio.especificacion import EspecificacionProyecto
+from dominio.plan_generacion import PlanGeneracion
 
 
 class Blueprint(ABC):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from dominio.modelos import EspecificacionProyecto
+from dominio.especificacion import EspecificacionProyecto
 
 
 class GeneradorManifestPuerto(Protocol):
