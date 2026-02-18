@@ -57,3 +57,27 @@ def test_auditor_permite_sqlite3_en_infraestructura(tmp_path: Path) -> None:
     resultado = AuditarProyectoGenerado(EjecutorFalso()).ejecutar(str(tmp_path))
 
     assert resultado.valido is True
+
+
+def test_auditor_rechaza_openpyxl_fuera_de_infraestructura(tmp_path: Path) -> None:
+    _crear_base(tmp_path)
+    (tmp_path / "aplicacion" / "caso.py").write_text("from openpyxl import Workbook\n", encoding="utf-8")
+
+    resultado = AuditarProyectoGenerado(EjecutorFalso()).ejecutar(str(tmp_path))
+
+    assert resultado.valido is False
+    assert any("openpyxl fuera de infraestructura" in error for error in resultado.lista_errores)
+
+
+def test_auditor_requiere_dependencias_si_hay_blueprints_informes(tmp_path: Path) -> None:
+    _crear_base(tmp_path)
+    (tmp_path / "requirements.txt").write_text("pytest==8.3.3\n", encoding="utf-8")
+
+    resultado = AuditarProyectoGenerado(EjecutorFalso()).ejecutar(
+        str(tmp_path),
+        blueprints_usados=["base_clean_arch", "crud_json", "export_excel", "export_pdf"],
+    )
+
+    assert resultado.valido is False
+    assert any("openpyxl" in error for error in resultado.lista_errores)
+    assert any("reportlab" in error for error in resultado.lista_errores)

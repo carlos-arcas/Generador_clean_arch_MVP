@@ -30,6 +30,13 @@ class CrearPlanProyectoBase:
                 ArchivoGenerado("README.md", contenido_readme),
                 ArchivoGenerado("VERSION", especificacion.version),
                 ArchivoGenerado("CHANGELOG.md", contenido_changelog),
+                ArchivoGenerado(
+                    "requirements.txt",
+                    "pytest==8.3.3\n"
+                    "pytest-cov==5.0.0\n"
+                    "openpyxl==3.1.5\n"
+                    "reportlab==4.2.5\n",
+                ),
                 ArchivoGenerado("dominio/.gitkeep", ""),
                 ArchivoGenerado("aplicacion/.gitkeep", ""),
                 ArchivoGenerado("infraestructura/.gitkeep", ""),

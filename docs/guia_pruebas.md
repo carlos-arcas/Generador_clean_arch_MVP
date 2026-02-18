@@ -80,3 +80,21 @@ Se incorporan pruebas enfocadas en actualización incremental de proyecto existe
   - valida actualización de timestamp sin mutar hashes previos.
 
 Estas pruebas usan `tmp_path` y no ejecutan procesos reales externos.
+
+
+## Pruebas de blueprints de informes (v0.9.0)
+Se agregan suites específicas para exportación:
+
+- `tests/blueprints/test_export_csv_blueprint.py`
+  - valida rutas de puerto/caso de uso/adaptador CSV;
+  - verifica ausencia de archivos generados en dominio.
+- `tests/blueprints/test_export_excel_blueprint.py`
+  - valida rutas de puerto/caso de uso/adaptador Excel;
+  - verifica ausencia de archivos generados en dominio.
+- `tests/blueprints/test_export_pdf_blueprint.py`
+  - valida rutas de puerto/caso de uso/adaptador PDF;
+  - verifica compatibilidad sin conflictos entre planes `export_pdf` y `export_csv`.
+
+Además, `tests/aplicacion/test_auditor_imports.py` amplía cobertura del auditor para:
+- imports `openpyxl` fuera de infraestructura,
+- validación de dependencias `openpyxl`/`reportlab` en `requirements.txt` cuando hay blueprints de informes.

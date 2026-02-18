@@ -18,3 +18,16 @@ def test_crear_plan_proyecto_base_genera_archivos_minimos() -> None:
     assert "CHANGELOG.md" in rutas
     contenido_version = [a for a in plan.archivos if a.ruta_relativa == "VERSION"][0]
     assert contenido_version.contenido_texto == "0.3.1"
+
+
+def test_crear_plan_base_incluye_requirements_informes() -> None:
+    especificacion = EspecificacionProyecto(
+        nombre_proyecto="demo",
+        ruta_destino="/tmp/demo",
+    )
+
+    plan = CrearPlanProyectoBase().ejecutar(especificacion)
+    contenido = next(a.contenido_texto for a in plan.archivos if a.ruta_relativa == "requirements.txt")
+
+    assert "openpyxl==3.1.5" in contenido
+    assert "reportlab==4.2.5" in contenido

@@ -95,3 +95,22 @@ La persistencia de `manifest.json` usa archivo temporal + replace atómico. Moti
 - evitar archivos truncados ante fallos intermedios,
 - asegurar estado consistente incluso con cierres inesperados,
 - mantener confiabilidad del punto de control de PATCH.
+
+
+## Exportación tabular por formato con puertos en aplicación (v0.9.0)
+Se decide modelar exportación como puertos de aplicación por formato (`CSV`, `Excel`, `PDF`) y casos de uso de informe por entidad. Motivos:
+- mantener dominio totalmente aislado de infraestructura,
+- permitir reemplazar librerías de exportación sin tocar casos de uso,
+- evitar acoplar la lógica de obtención de datos al mecanismo de salida.
+
+## PDF básico sin maquetación avanzada
+Se adopta un exportador PDF funcional mínimo (título, encabezados y filas con salto de página automático). Motivos:
+- cumplir necesidad operativa de exportar reportes sin introducir complejidad de diseño visual,
+- reducir superficie de errores y mantenimiento,
+- conservar consistencia con enfoque MVP del generador.
+
+## Dependencias explícitas para informes
+Se incorporan `openpyxl` y `reportlab` con versión fija en `requirements.txt` del generador y en plantillas base del proyecto generado. Motivos:
+- evitar diferencias de comportamiento por versión,
+- asegurar que proyectos con blueprints de informes ejecuten pruebas desde cero,
+- simplificar auditoría de dependencias requeridas.
