@@ -68,10 +68,15 @@ class TrabajadorGeneracion(QRunnable):
             )
 
             self.senales.progreso.emit("Ejecutando auditoría...")
-            resultado_auditoria = self._auditor.ejecutar(self._especificacion.ruta_destino)
+            resultado_auditoria = self._auditor.ejecutar(
+                self._especificacion.ruta_destino,
+                blueprints_usados=self._blueprints,
+            )
             LOGGER.info(
-                "Resultado auditoría desde worker: valido=%s errores=%s",
+                "Resultado auditoría desde worker: valido=%s cobertura=%s resumen=%s errores=%s",
                 resultado_auditoria.valido,
+                resultado_auditoria.cobertura,
+                resultado_auditoria.resumen,
                 resultado_auditoria.lista_errores,
             )
             self.senales.finalizado.emit(

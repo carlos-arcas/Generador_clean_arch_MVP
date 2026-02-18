@@ -2,6 +2,19 @@
 
 Todos los cambios importantes de este proyecto se documentan en este archivo.
 
+## [0.6.0] - 2026-02-18
+### Agregado
+- Auditor avanzado de proyectos generados con validación de estructura, imports prohibidos, ciclos básicos y reglas de logging.
+- Puerto `EjecutorProcesos` y adaptador `EjecutorProcesosSubprocess` para ejecutar `pytest --cov=. --cov-report=term` desde el auditor.
+- Generación automática de `docs/informe_auditoria.md` dentro del proyecto generado con conclusión APROBADO/RECHAZADO.
+- Nuevas pruebas unitarias para estructura, imports y cobertura mockeada del auditor.
+
+### Cambiado
+- `ResultadoAuditoria` ahora incluye `cobertura` y `resumen` además del estado general.
+- Integración de UI para mostrar resumen de auditoría avanzada y registrar rechazos con detalle en logs de crashes.
+- `CrearPlanProyectoBase` genera estructura base completa (capas, docs, logs y `infraestructura/logging_config.py`) para cumplir auditoría estricta.
+- Versión del generador actualizada a `0.6.0`.
+
 ## [0.5.0] - 2026-02-18
 ### Agregado
 - Nueva capa de presentación PySide6 con `VentanaPrincipal` y `WizardProyecto` de cuatro páginas (datos, clases, blueprints y resumen).

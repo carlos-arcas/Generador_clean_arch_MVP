@@ -44,3 +44,21 @@ Se agregan pruebas de wiring mínimas para validar integración PySide6 sin test
   - valida que el entrypoint `python -m presentacion` construye aplicación y ventana sin levantar UI real (dobles de prueba).
 
 Estas pruebas comprueban orquestación y contratos de integración, dejando la lógica de negocio en dominio/aplicación.
+
+## Auditoría automática del proyecto generado (v0.6.0)
+El caso de uso `AuditarProyectoGenerado` ahora ejecuta validaciones avanzadas después de generar un proyecto:
+
+1. Estructura obligatoria (`dominio`, `aplicacion`, `infraestructura`, `presentacion`, `tests`, `scripts`, `logs`, `docs`, `VERSION`, `CHANGELOG.md`).
+2. Reglas de arquitectura por imports y ciclos básicos.
+3. Validación de logging (`infraestructura/logging_config.py`, `logs/seguimiento.log`, `logs/crashes.log`).
+4. Ejecución de `pytest --cov=. --cov-report=term` y umbral mínimo de 85%.
+
+### Pruebas unitarias del auditor avanzado
+- `tests/aplicacion/test_auditor_estructura.py`
+  - valida estructura correcta y generación de `docs/informe_auditoria.md`.
+- `tests/aplicacion/test_auditor_imports.py`
+  - valida imports prohibidos y detección de import circular básico.
+- `tests/aplicacion/test_auditor_cobertura_mock.py`
+  - mockea el puerto `EjecutorProcesos` para escenarios de cobertura 90% (aprobado) y 70% (rechazado).
+
+> Nota: en pruebas del generador no se ejecuta `pytest` real del proyecto generado; se usa mock del puerto de procesos para mantener pruebas rápidas y deterministas.
