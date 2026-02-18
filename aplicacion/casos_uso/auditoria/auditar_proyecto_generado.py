@@ -1,33 +1,54 @@
-"""Auditor automático post-generación para proyectos Clean Architecture."""
+"""Caso de uso para auditar estructura, arquitectura y cobertura de un proyecto generado."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 import json
 import logging
 from pathlib import Path
 import re
-import subprocess
+
+from aplicacion.errores import ErrorAuditoria
+from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
+from infraestructura.calculadora_hash_real import CalculadoraHashReal
+from infraestructura.ejecutor_procesos_subprocess import EjecutorProcesosSubprocess
 
 LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass
 class ResultadoAuditoria:
-    """Resultado de la auditoría automática post-generación."""
+    """Resultado detallado de la auditoría del proyecto generado."""
 
-    errores: list[str] = field(default_factory=list)
+    valido: bool
+    lista_errores: list[str] = field(default_factory=list)
+    cobertura: float | None = None
+    resumen: str = ""
     warnings: list[str] = field(default_factory=list)
 
     @property
-    def valido(self) -> bool:
-        return not self.errores
+    def errores(self) -> list[str]:
+        """Alias para compatibilidad con consumidores de la API nueva."""
+        return self.lista_errores
 
 
 class AuditarProyectoGenerado:
-    """Valida estructura mínima e integridad básica del proyecto generado."""
+    """Verifica reglas de calidad para el proyecto generado."""
 
-    CARPETAS_OBLIGATORIAS = [
+    ESTRUCTURA_REQUERIDA = [
+        "dominio",
+        "aplicacion",
+        "infraestructura",
+        "presentacion",
+        "tests",
+        "scripts",
+        "logs",
+        "docs",
+        "VERSION",
+        "CHANGELOG.md",
+    ]
+    CARPETAS_OBLIGATORIAS_MVP = [
         "dominio",
         "aplicacion",
         "infraestructura",
@@ -38,77 +59,306 @@ class AuditarProyectoGenerado:
         "configuracion",
         "scripts",
     ]
+    ARCHIVOS_OBLIGATORIOS_MVP = ["VERSION", "CHANGELOG.md", "requirements.txt"]
 
-    ARCHIVOS_OBLIGATORIOS = [
-        "VERSION",
-        "CHANGELOG.md",
-        "requirements.txt",
-    ]
+    def __init__(self, ejecutor_procesos: EjecutorProcesos | None = None) -> None:
+        self._ejecutor_procesos = ejecutor_procesos or EjecutorProcesosSubprocess()
+        self._calculadora_hash = CalculadoraHashReal()
 
-    def __init__(self, ejecutar_pytest: bool = False) -> None:
-        self._ejecutar_pytest = ejecutar_pytest
+    def auditar(self, ruta_proyecto: str, blueprints_usados: list[str] | None = None) -> ResultadoAuditoria:
+        """Auditoría ligera usada por la generación MVP."""
+        base = Path(ruta_proyecto)
+        if not base.exists() or not base.is_dir():
+            return ResultadoAuditoria(
+                valido=False,
+                lista_errores=[f"La ruta '{ruta_proyecto}' no existe o no es un directorio."],
+            )
 
-    def auditar(self, ruta_proyecto: str) -> ResultadoAuditoria:
-        """Ejecuta la auditoría del proyecto generado."""
+        errores: list[str] = []
+        errores.extend(self._validar_estructura_mvp(base))
+        errores.extend(self._validar_archivos_mvp(base))
+        errores.extend(self._validar_manifest_mvp(base))
+        errores.extend(self._validar_dependencias_capas_mvp(base))
+        return ResultadoAuditoria(
+            valido=not errores,
+            lista_errores=errores,
+            warnings=[],
+            resumen=f"Auditoría {'APROBADO' if not errores else 'RECHAZADO'}. Errores: {len(errores)}.",
+        )
+
+    def ejecutar(self, ruta_proyecto: str, blueprints_usados: list[str] | None = None) -> ResultadoAuditoria:
+        """Ejecuta las validaciones obligatorias sobre un proyecto ya generado."""
         base = Path(ruta_proyecto)
         errores: list[str] = []
         warnings: list[str] = []
+        blueprints = blueprints_usados or []
+        resultado_pytest = ResultadoProceso(codigo_salida=1, stdout="No ejecutado", stderr="")
+        cobertura: float | None = None
+        conclusion = "RECHAZADO"
+        LOGGER.info("Inicio auditoría avanzada proyecto=%s", ruta_proyecto)
 
-        if not base.exists() or not base.is_dir():
-            return ResultadoAuditoria(errores=[f"La ruta '{ruta_proyecto}' no existe o no es un directorio."])
+        try:
+            if not base.exists() or not base.is_dir():
+                return ResultadoAuditoria(
+                    valido=False,
+                    lista_errores=[f"La ruta '{ruta_proyecto}' no existe o no es un directorio."],
+                    warnings=warnings,
+                )
 
-        errores.extend(self._validar_estructura(base))
-        errores.extend(self._validar_archivos(base))
-        errores.extend(self._validar_manifest(base))
-        errores.extend(self._validar_dependencias_capas(base))
+            errores.extend(self._validar_estructura(base))
+            errores.extend(self._validar_imports(base))
+            errores.extend(self._validar_logging(base))
+            errores.extend(self._validar_dependencias_informes(base, blueprints))
+            errores.extend(self._validar_consistencia_manifest(base))
 
-        if self._ejecutar_pytest:
-            warnings.extend(self._ejecutar_pytest_opcional(base))
+            resultado_pytest = self._ejecutor_procesos.ejecutar(
+                comando=["pytest", "--cov=.", "--cov-report=term"],
+                cwd=str(base),
+            )
+            cobertura = self._extraer_cobertura_total(resultado_pytest.stdout)
+            if cobertura is None:
+                errores.append("No fue posible extraer el porcentaje total de cobertura de pytest.")
+            elif cobertura < 85.0:
+                errores.append(f"Cobertura insuficiente: {cobertura:.2f}% (mínimo requerido: 85%).")
 
-        LOGGER.info(
-            "Auditoría post-generación finalizada: valido=%s errores=%s warnings=%s",
-            len(errores) == 0,
-            len(errores),
-            len(warnings),
-        )
-        for error in errores:
-            LOGGER.error("AUDIT ERROR: %s", error)
-        for warning in warnings:
-            LOGGER.warning("AUDIT WARNING: %s", warning)
+            if resultado_pytest.codigo_salida != 0 and cobertura is None:
+                errores.append("La ejecución de pytest finalizó con error y sin reporte de cobertura usable.")
 
-        return ResultadoAuditoria(errores=errores, warnings=warnings)
+            LOGGER.info("Cobertura total detectada: %s", cobertura)
+            LOGGER.info("Errores de auditoría detectados: %s", errores)
+
+            valido = not errores
+            conclusion = "APROBADO" if valido else "RECHAZADO"
+            resumen = (
+                f"Auditoría {conclusion}. "
+                f"Errores: {len(errores)}. "
+                f"Cobertura: {f'{cobertura:.2f}%' if cobertura is not None else 'no disponible'}."
+            )
+            return ResultadoAuditoria(
+                valido=valido,
+                lista_errores=errores,
+                cobertura=cobertura,
+                resumen=resumen,
+                warnings=warnings,
+            )
+        except Exception as exc:
+            LOGGER.error("Fallo inesperado en auditoría: %s", exc, exc_info=True)
+            errores.append(f"Error de auditoría: {exc}")
+            raise ErrorAuditoria(f"No fue posible completar la auditoría: {exc}") from exc
+        finally:
+            self._escribir_informe(
+                base=base,
+                blueprints=blueprints,
+                errores=errores,
+                cobertura=cobertura,
+                resultado_pytest=resultado_pytest,
+                conclusion=conclusion,
+            )
 
     def _validar_estructura(self, base: Path) -> list[str]:
+        LOGGER.info("Evaluando reglas de estructura")
         errores: list[str] = []
-        for carpeta in self.CARPETAS_OBLIGATORIAS:
+        for relativo in self.ESTRUCTURA_REQUERIDA:
+            if not (base / relativo).exists():
+                errores.append(f"No existe el recurso obligatorio: {relativo}")
+        return errores
+
+    def _validar_imports(self, base: Path) -> list[str]:
+        LOGGER.info("Evaluando reglas de arquitectura por imports")
+        errores: list[str] = []
+        modulos_estandar_restringidos = {"json", "sqlite3"}
+        modulos_exportacion = {"openpyxl", "reportlab"}
+        prefijos_externos = {"pydantic", "requests", "sqlalchemy", "fastapi", "pyside6"}
+        patron_import = re.compile(r"^\s*import\s+([a-zA-Z0-9_\.]+)", re.MULTILINE)
+        patron_from = re.compile(r"^\s*from\s+([a-zA-Z0-9_\.]+)\s+import\s+", re.MULTILINE)
+        grafo_imports: dict[str, set[str]] = {}
+
+        for ruta_archivo in base.rglob("*.py"):
+            relativo = ruta_archivo.relative_to(base)
+            modulo_actual = self._ruta_a_modulo(relativo)
+            contenido = ruta_archivo.read_text(encoding="utf-8")
+            imports = set(patron_import.findall(contenido)) | set(patron_from.findall(contenido))
+            grafo_imports[modulo_actual] = imports
+            if not relativo.parts:
+                continue
+
+            for modulo in imports:
+                modulo_raiz = modulo.lower().split(".")[0]
+                if modulo_raiz == "sqlite3" and relativo.parts[0] != "infraestructura":
+                    errores.append(f"Import sqlite3 fuera de infraestructura ({relativo}): {modulo}")
+                if modulo_raiz in modulos_exportacion and relativo.parts[0] != "infraestructura":
+                    errores.append(f"Import {modulo_raiz} fuera de infraestructura ({relativo}): {modulo}")
+
+            if relativo.parts[0] == "dominio":
+                for modulo in imports:
+                    modulo_bajo = modulo.lower()
+                    if modulo_bajo.startswith("infraestructura"):
+                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
+                    if modulo_bajo.startswith("presentacion"):
+                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
+                    if modulo_bajo.startswith("pyside6"):
+                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
+                    if modulo_bajo.split(".")[0] in modulos_estandar_restringidos:
+                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
+                    if modulo_bajo.split(".")[0] in prefijos_externos:
+                        errores.append(f"Import externo no permitido en dominio ({relativo}): {modulo}")
+            elif relativo.parts[0] == "aplicacion":
+                for modulo in imports:
+                    if modulo.lower().startswith("presentacion"):
+                        errores.append(f"Import prohibido en aplicación ({relativo}): {modulo}")
+            elif relativo.parts[0] == "presentacion":
+                for modulo in imports:
+                    if modulo.lower().startswith("infraestructura"):
+                        errores.append(f"Import prohibido en presentación ({relativo}): {modulo}")
+
+        errores.extend(self._detectar_ciclos_basicos(grafo_imports))
+        return errores
+
+    def _validar_dependencias_informes(self, base: Path, blueprints: list[str]) -> list[str]:
+        blueprints_informes = {"export_excel", "export_pdf"}
+        if not any(nombre in blueprints_informes for nombre in blueprints):
+            return []
+
+        ruta_requirements = base / "requirements.txt"
+        if not ruta_requirements.exists():
+            return ["No existe requirements.txt y se solicitaron blueprints de informes."]
+
+        contenido = ruta_requirements.read_text(encoding="utf-8").lower()
+        errores: list[str] = []
+        if "openpyxl" not in contenido:
+            errores.append("requirements.txt no incluye openpyxl para exportación Excel.")
+        if "reportlab" not in contenido:
+            errores.append("requirements.txt no incluye reportlab para exportación PDF.")
+        return errores
+
+    def _validar_consistencia_manifest(self, base: Path) -> list[str]:
+        ruta_manifest = base / "manifest.json"
+        if not ruta_manifest.exists():
+            return []
+        payload = json.loads(ruta_manifest.read_text(encoding="utf-8"))
+        errores: list[str] = []
+        for entrada in payload.get("archivos", []):
+            ruta_relativa = entrada.get("ruta_relativa", "")
+            hash_esperado = entrada.get("hash_sha256", "")
+            if not ruta_relativa or not hash_esperado:
+                errores.append("manifest.json contiene entradas incompletas.")
+                continue
+            ruta_archivo = base / ruta_relativa
+            if not ruta_archivo.exists():
+                errores.append(f"manifest.json referencia archivo inexistente: {ruta_relativa}")
+                continue
+            hash_actual = self._calculadora_hash.calcular_sha256(str(ruta_archivo))
+            if hash_actual != hash_esperado:
+                errores.append(f"Hash inconsistente para {ruta_relativa} en manifest.json")
+        return errores
+
+    def _detectar_ciclos_basicos(self, grafo_imports: dict[str, set[str]]) -> list[str]:
+        errores: list[str] = []
+        for modulo, dependencias in grafo_imports.items():
+            for dependencia in dependencias:
+                if dependencia in grafo_imports and modulo in grafo_imports.get(dependencia, set()):
+                    errores.append(f"Import circular detectado entre {modulo} y {dependencia}")
+        return sorted(set(errores))
+
+    def _validar_logging(self, base: Path) -> list[str]:
+        LOGGER.info("Evaluando reglas de logging")
+        errores: list[str] = []
+        if not (base / "infraestructura" / "logging_config.py").exists():
+            errores.append("No existe configuración de logging en infraestructura/logging_config.py")
+        if not (base / "logs" / "seguimiento.log").exists():
+            errores.append("No existe logs/seguimiento.log")
+        if not (base / "logs" / "crashes.log").exists():
+            errores.append("No existe logs/crashes.log")
+        return errores
+
+    def _extraer_cobertura_total(self, salida: str) -> float | None:
+        coincidencias = re.findall(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", salida)
+        if not coincidencias:
+            return None
+        return float(coincidencias[-1])
+
+    def _escribir_informe(
+        self,
+        base: Path,
+        blueprints: list[str],
+        errores: list[str],
+        cobertura: float | None,
+        resultado_pytest: ResultadoProceso,
+        conclusion: str,
+    ) -> None:
+        ruta_docs = base / "docs"
+        ruta_docs.mkdir(parents=True, exist_ok=True)
+        ruta_informe = ruta_docs / "informe_auditoria.md"
+
+        estructura_ok = "OK" if not any("recurso obligatorio" in e for e in errores) else "ERROR"
+        arquitectura_ok = "OK" if not any("Import" in e or "circular" in e for e in errores) else "ERROR"
+        logging_ok = "OK" if not any("logging" in e or "logs/" in e for e in errores) else "ERROR"
+        manifest_ok = "OK" if not any("manifest" in e or "Hash" in e for e in errores) else "ERROR"
+
+        contenido = (
+            "# Informe de Auditoría\n\n"
+            "## Fecha\n"
+            f"{datetime.now().isoformat(timespec='seconds')}\n\n"
+            "## Blueprints usados\n"
+            f"{', '.join(blueprints) if blueprints else 'No informado'}\n\n"
+            "## Validación de estructura\n"
+            f"Resultado: {estructura_ok}\n\n"
+            "## Validación de arquitectura (imports)\n"
+            f"Resultado: {arquitectura_ok}\n\n"
+            "## Validación logging\n"
+            f"Resultado: {logging_ok}\n\n"
+            "## Consistencia manifest/hash\n"
+            f"Resultado: {manifest_ok}\n\n"
+            "## Resultado pytest\n"
+            f"Código de salida: {resultado_pytest.codigo_salida}\n\n"
+            "```\n"
+            f"{resultado_pytest.stdout.strip()}\n"
+            "```\n\n"
+            "## Cobertura total\n"
+            f"{f'{cobertura:.2f}%' if cobertura is not None else 'No disponible'}\n\n"
+            "## Conclusión final (APROBADO / RECHAZADO)\n"
+            f"{conclusion}\n\n"
+        )
+
+        if errores:
+            contenido += "### Errores detectados\n\n"
+            for error in errores:
+                contenido += f"- {error}\n"
+
+        ruta_informe.write_text(contenido, encoding="utf-8")
+
+    def _ruta_a_modulo(self, relativa: Path) -> str:
+        sin_sufijo = relativa.with_suffix("")
+        return ".".join(sin_sufijo.parts)
+
+    def _validar_estructura_mvp(self, base: Path) -> list[str]:
+        errores: list[str] = []
+        for carpeta in self.CARPETAS_OBLIGATORIAS_MVP:
             if not (base / carpeta).is_dir():
                 errores.append(f"No existe la carpeta obligatoria: {carpeta}")
         return errores
 
-    def _validar_archivos(self, base: Path) -> list[str]:
+    def _validar_archivos_mvp(self, base: Path) -> list[str]:
         errores: list[str] = []
-        for archivo in self.ARCHIVOS_OBLIGATORIOS:
+        for archivo in self.ARCHIVOS_OBLIGATORIOS_MVP:
             if not (base / archivo).is_file():
                 errores.append(f"No existe el archivo obligatorio: {archivo}")
         return errores
 
-    def _validar_manifest(self, base: Path) -> list[str]:
+    def _validar_manifest_mvp(self, base: Path) -> list[str]:
         candidatos = [base / "MANIFEST.json", base / "configuracion" / "MANIFEST.json", base / "manifest.json"]
         ruta_manifest = next((ruta for ruta in candidatos if ruta.exists()), None)
         if ruta_manifest is None:
             return ["No existe MANIFEST requerido: MANIFEST.json"]
-
         try:
             payload = json.loads(ruta_manifest.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             return [f"{ruta_manifest.name} no es un JSON válido: {exc}"]
-
         if not isinstance(payload, dict):
             return [f"{ruta_manifest.name} debe contener un objeto JSON en raíz."]
-
         return []
 
-    def _validar_dependencias_capas(self, base: Path) -> list[str]:
+    def _validar_dependencias_capas_mvp(self, base: Path) -> list[str]:
         errores: list[str] = []
         patron_import = re.compile(r"^\s*import\s+([\w\.]+)", re.MULTILINE)
         patron_from = re.compile(r"^\s*from\s+([\w\.]+)\s+import\s+", re.MULTILINE)
@@ -120,11 +370,9 @@ class AuditarProyectoGenerado:
                 continue
             if not relativo.parts:
                 continue
-
             capa = relativo.parts[0]
             if capa not in {"dominio", "aplicacion"}:
                 continue
-
             contenido = archivo.read_text(encoding="utf-8")
             imports = set(patron_import.findall(contenido)) | set(patron_from.findall(contenido))
             for modulo in imports:
@@ -133,32 +381,7 @@ class AuditarProyectoGenerado:
                     modulo_normalizado.startswith("infraestructura")
                     or modulo_normalizado.startswith("presentacion")
                 ):
-                    errores.append(
-                        f"Import prohibido en dominio ({relativo}): {modulo}"
-                    )
+                    errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
                 if capa == "aplicacion" and modulo_normalizado.startswith("presentacion"):
-                    errores.append(
-                        f"Import prohibido en aplicacion ({relativo}): {modulo}"
-                    )
+                    errores.append(f"Import prohibido en aplicacion ({relativo}): {modulo}")
         return errores
-
-    def _ejecutar_pytest_opcional(self, base: Path) -> list[str]:
-        try:
-            resultado = subprocess.run(
-                ["pytest", "-q"],
-                cwd=base,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except FileNotFoundError:
-            return ["pytest no está disponible en el entorno; se omite validación opcional."]
-        except Exception as exc:  # noqa: BLE001
-            return [f"No se pudo ejecutar pytest de forma opcional: {exc}"]
-
-        if resultado.returncode != 0:
-            return [
-                "pytest opcional reportó fallos en el proyecto generado.",
-                resultado.stdout.strip() or resultado.stderr.strip() or "Sin salida adicional.",
-            ]
-        return []

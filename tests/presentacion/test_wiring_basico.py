@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 QtWidgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 QApplication = QtWidgets.QApplication
 
-from aplicacion.casos_uso.auditar_proyecto_generado import ResultadoAuditoria
+from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import ResultadoAuditoria
 from dominio.modelos import EspecificacionProyecto
 from presentacion.trabajadores.trabajador_generacion import ResultadoGeneracion, TrabajadorGeneracion
 from presentacion.ventana_principal import VentanaPrincipal
