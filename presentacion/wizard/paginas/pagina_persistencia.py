@@ -25,3 +25,9 @@ class PaginaPersistencia(QWizardPage):
         if self.radio_sqlite.isChecked():
             return "SQLite"
         return "JSON"
+
+    def establecer_persistencia(self, persistencia: str) -> None:
+        if persistencia.lower() == "sqlite":
+            self.radio_sqlite.setChecked(True)
+            return
+        self.radio_json.setChecked(True)

@@ -1,0 +1,29 @@
+{
+  "nombre": "api_basica",
+  "especificacion": {
+    "nombre_proyecto": "ApiBasica",
+    "descripcion": "Preset base para APIs MVP",
+    "version": "1.0.0",
+    "ruta_destino": "",
+    "clases": [
+      {
+        "nombre": "Cliente",
+        "atributos": [
+          {
+            "nombre": "nombre",
+            "tipo": "str",
+            "obligatorio": true,
+            "valor_por_defecto": null
+          }
+        ]
+      }
+    ]
+  },
+  "blueprints": [
+    "base_clean_arch_v1",
+    "crud_json_v1"
+  ],
+  "metadata": {
+    "persistencia": "JSON"
+  }
+}
