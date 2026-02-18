@@ -100,3 +100,14 @@ Este flujo evita bloqueo de interfaz y mantiene dependencia hacia adentro: la UI
 - La ejecución de comandos se abstrae con el puerto `EjecutorProcesos`, implementado por `infraestructura/ejecutor_procesos_subprocess.py`.
 - El auditor genera `docs/informe_auditoria.md` dentro del proyecto generado para trazabilidad post-ejecución.
 - `presentacion` solo consume el resumen (`ResultadoAuditoria.resumen`) y errores, manteniendo la lógica de auditoría encapsulada en aplicación.
+
+## Flujo modo PATCH incremental (v0.8.0)
+1. Presentación detecta `manifest.json` en la ruta destino y activa automáticamente modo PATCH.
+2. `CrearPlanPatchDesdeBlueprints` lee manifest, identifica blueprints usados y filtra únicamente clases nuevas.
+3. Se construye un plan parcial con los mismos blueprints originales del proyecto.
+4. Antes de ejecutar, se valida conflicto de rutas contra:
+   - rutas ya registradas en manifest,
+   - archivos ya existentes en disco.
+5. `EjecutarPlan` escribe solo archivos nuevos (sin regenerar manifest completo).
+6. `ActualizarManifestPatch` calcula hash de archivos nuevos, anexa entradas al manifest y persiste con escritura atómica.
+7. Se ejecuta auditor avanzado y se regenera `docs/informe_auditoria.md`.

@@ -47,6 +47,8 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
     crear_plan.ejecutar.return_value = mock_plan
 
     ejecutar_plan = Mock()
+    crear_plan_patch = Mock()
+    actualizar_manifest_patch = Mock()
 
     resultado_auditoria = ResultadoAuditoria(valido=True, lista_errores=[])
     auditor = Mock()
@@ -56,7 +58,9 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
         especificacion=especificacion,
         blueprints=["base_clean_arch", "crud_json"],
         crear_plan_desde_blueprints=crear_plan,
+        crear_plan_patch_desde_blueprints=crear_plan_patch,
         ejecutar_plan=ejecutar_plan,
+        actualizar_manifest_patch=actualizar_manifest_patch,
         auditor=auditor,
         version_generador="0.7.0",
     )
@@ -67,7 +71,9 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
     worker.run()
 
     crear_plan.ejecutar.assert_called_once_with(especificacion, ["base_clean_arch", "crud_json"])
+    crear_plan_patch.ejecutar.assert_not_called()
     ejecutar_plan.ejecutar.assert_called_once()
+    actualizar_manifest_patch.ejecutar.assert_not_called()
     auditor.ejecutar.assert_called_once_with(
         "salida/demo",
         blueprints_usados=["base_clean_arch", "crud_json"],

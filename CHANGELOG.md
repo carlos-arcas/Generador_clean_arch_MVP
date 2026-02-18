@@ -2,6 +2,19 @@
 
 Todos los cambios importantes de este proyecto se documentan en este archivo.
 
+## [0.8.0] - 2026-02-18
+### Agregado
+- Modo PATCH incremental para proyectos existentes: lectura de `manifest.json`, detección de clases ya generadas y generación de plan parcial solo para clases nuevas.
+- Nuevos casos de uso `CrearPlanPatchDesdeBlueprints` y `ActualizarManifestPatch`.
+- Adaptadores de infraestructura `LectorManifestEnDisco` y `EscritorManifestSeguro` (escritura atómica de manifest).
+- Nuevas pruebas de aplicación para escenario PATCH (`test_patch_nueva_clase.py`, `test_patch_clase_existente_error.py`, `test_actualizar_manifest_patch.py`).
+
+### Cambiado
+- `TrabajadorGeneracion` ahora detecta automáticamente modo PATCH cuando existe `manifest.json` en ruta destino.
+- `EjecutarPlan` incorpora bandera `generar_manifest` para evitar sobreescribir manifest en PATCH.
+- Resumen del wizard muestra clases nuevas a añadir y clases bloqueadas por existir previamente.
+- Método de dominio `ManifestProyecto.obtener_clases_generadas()` para inferir entidades desde rutas del manifest.
+
 ## [0.7.0] - 2026-02-18
 ### Agregado
 - Nuevo blueprint `crud_sqlite_v1` (`crud_sqlite@1.0.0`) con repositorios SQLite por entidad en `infraestructura/persistencia/sqlite`.
