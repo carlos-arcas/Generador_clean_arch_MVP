@@ -6,6 +6,10 @@
 - Eliminada duplicidad de módulo de auditoría.
 - Unificada fuente única de auditoría.
 
+### Añadido
+- Test de integración completo del generador MVP.
+
+
 
 ## [1.5.1] - 2026-02-18
 
