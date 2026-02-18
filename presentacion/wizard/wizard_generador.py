@@ -24,6 +24,10 @@ from aplicacion.casos_uso.presets import CargarPresetProyecto, GuardarPresetProy
 from aplicacion.casos_uso.seguridad import GuardarCredencial
 from aplicacion.dtos.proyecto import DtoAtributo, DtoClase, DtoProyectoEntrada
 from presentacion.wizard.dtos import DatosWizardProyecto
+from presentacion.wizard.orquestadores.orquestador_finalizacion_wizard import (
+    DtoEntradaFinalizacionWizard,
+    OrquestadorFinalizacionWizard,
+)
 from presentacion.wizard.paginas.pagina_clases import PaginaClases
 from presentacion.wizard.paginas.pagina_datos_proyecto import PaginaDatosProyecto
 from presentacion.wizard.paginas.pagina_persistencia import PaginaPersistencia
@@ -71,6 +75,7 @@ class WizardGeneradorProyectos(QWizard):
         cargar_preset: CargarPresetProyecto | None = None,
         guardar_credencial: GuardarCredencial | None = None,
         catalogo_blueprints: list[tuple[str, str, str]] | None = None,
+        orquestador_finalizacion: OrquestadorFinalizacionWizard | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("Generador Base Proyectos")
@@ -100,6 +105,11 @@ class WizardGeneradorProyectos(QWizard):
         self._guardar_credencial = guardar_credencial
         self._catalogo_blueprints = catalogo_blueprints
         self._constructor_especificacion = ConstruirEspecificacionProyecto()
+        self._orquestador_finalizacion = orquestador_finalizacion or OrquestadorFinalizacionWizard(
+            validador_final=self._constructor_especificacion.ejecutar,
+            lanzador_generacion=self._lanzar_generacion_asincrona,
+            servicio_credenciales=self._guardar_credencial,
+        )
 
         self.pagina_datos = PaginaDatosProyecto()
         self.pagina_clases = PaginaClases()
@@ -131,51 +141,33 @@ class WizardGeneradorProyectos(QWizard):
         )
 
     def _al_finalizar(self) -> None:
-        dto = self._controlador.construir_dto(self)
+        dto_wizard = self._controlador.construir_dto(self)
+        blueprints = self._blueprints_seleccionados()
         LOGGER.info(
             "Configuración wizard lista: nombre=%s ruta=%s persistencia=%s usuario_configurado=%s guardar_credencial=%s",
-            dto.nombre,
-            dto.ruta,
-            dto.persistencia,
-            bool(dto.usuario_credencial),
-            dto.guardar_credencial,
+            dto_wizard.nombre,
+            dto_wizard.ruta,
+            dto_wizard.persistencia,
+            bool(dto_wizard.usuario_credencial),
+            dto_wizard.guardar_credencial,
+        )
+        resultado = self._orquestador_finalizacion.finalizar(
+            DtoEntradaFinalizacionWizard(datos_wizard=dto_wizard, blueprints=blueprints)
         )
 
-        if dto.guardar_credencial and dto.usuario_credencial and dto.secreto_credencial:
-            identificador = f"generador:{dto.nombre}:{dto.persistencia.lower()}"
-            try:
-                self._guardar_credencial.ejecutar_desde_datos(
-                    identificador=identificador,
-                    usuario=dto.usuario_credencial,
-                    secreto=dto.secreto_credencial,
-                    tipo=dto.persistencia,
-                )
-                LOGGER.info("Credencial almacenada de forma segura para identificador=%s", identificador)
-            except Exception as exc:  # noqa: BLE001
-                LOGGER.warning(
-                    "No se pudo persistir credencial en almacenamiento seguro. Se continuará solo en memoria. %s",
-                    exc,
-                )
-                QMessageBox.warning(
-                    self,
-                    "Credenciales",
-                    "No se pudo guardar la credencial en el sistema seguro. Se usará únicamente en memoria durante esta ejecución.",
-                )
+        detalles = resultado.detalles or {}
+        advertencia_credenciales = detalles.get("advertencia_credenciales")
+        if advertencia_credenciales:
+            QMessageBox.warning(self, "Credenciales", advertencia_credenciales)
 
-        try:
-            especificacion = self._constructor_especificacion.ejecutar(dto.proyecto)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Error de validación", str(exc))
+        if resultado.exito:
             return
 
-        entrada = GenerarProyectoMvpEntrada(
-            especificacion_proyecto=especificacion,
-            ruta_destino=dto.ruta,
-            nombre_proyecto=dto.nombre,
-            blueprints=self._blueprints_seleccionados(),
-        )
-        self._cambiar_estado_generando(True, "Generando...")
+        self._cambiar_estado_generando(False, "")
+        QMessageBox.critical(self, "Error de validación", resultado.mensaje_usuario)
 
+    def _lanzar_generacion_asincrona(self, entrada: GenerarProyectoMvpEntrada) -> None:
+        self._cambiar_estado_generando(True, "Generando...")
         trabajador = TrabajadorGeneracionMvp(caso_uso=self._generador_mvp, entrada=entrada)
         trabajador.senales.progreso.connect(self._actualizar_estado)
         trabajador.senales.exito.connect(self._on_generacion_exitosa)
