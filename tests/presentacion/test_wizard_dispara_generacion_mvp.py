@@ -27,6 +27,7 @@ class GeneradorMvpDoble:
             archivos_generados=5,
             valido=True,
             errores=[],
+            warnings=[],
         )
 
 

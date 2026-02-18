@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.0] - 2026-02-18
+
+### Añadido
+- Auditor automático post-generación
+
+
 ## [1.3.0] - 2026-02-18
 
 ### Añadido

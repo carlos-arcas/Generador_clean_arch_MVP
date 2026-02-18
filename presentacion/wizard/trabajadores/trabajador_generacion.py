@@ -37,14 +37,11 @@ class TrabajadorGeneracionMvp(QRunnable):
         try:
             self.senales.progreso.emit("Construyendo plan desde blueprints...")
             salida = self._caso_uso.ejecutar(self._entrada)
-            if salida.valido:
-                self.senales.progreso.emit("Proyecto generado correctamente.")
-                self.senales.exito.emit(salida)
-                return
-
-            detalle = "\n".join(salida.errores) if salida.errores else "Sin detalles adicionales"
-            LOGGER.error("Generación MVP finalizó con errores de validación: %s", detalle)
-            self.senales.error.emit("Falló la generación (ver logs)", detalle)
+            self.senales.progreso.emit("Proyecto generado correctamente.")
+            if not salida.valido:
+                detalle = "\n".join(salida.errores) if salida.errores else "Sin detalles adicionales"
+                LOGGER.warning("Generación completada con auditoría inválida: %s", detalle)
+            self.senales.exito.emit(salida)
         except Exception as exc:  # pragma: no cover - protección adicional
             LOGGER.error("Excepción no controlada en trabajador MVP: %s", exc)
             detalle = traceback.format_exc()
