@@ -14,25 +14,16 @@ from PySide6.QtWidgets import (
     QWizard,
 )
 
-from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
-from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
     GenerarProyectoMvpSalida,
 )
-from aplicacion.casos_uso.generar_manifest import GenerarManifest
 from aplicacion.casos_uso.presets import CargarPresetProyecto, GuardarPresetProyecto
 from aplicacion.casos_uso.seguridad import GuardarCredencial
 from dominio.modelos import EspecificacionProyecto
 from dominio.seguridad import Credencial
 from dominio.preset.preset_proyecto import PresetProyecto
-from infraestructura.calculadora_hash_real import CalculadoraHashReal
-from infraestructura.plugins.descubridor_plugins import DescubridorPlugins
-from infraestructura.presets.repositorio_presets_json import RepositorioPresetsJson
-from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
-from infraestructura.sistema_archivos_real import SistemaArchivosReal
-from infraestructura.seguridad import SelectorRepositorioCredenciales
 from presentacion.wizard.dtos import DatosWizardProyecto
 from presentacion.wizard.paginas.pagina_clases import PaginaClases
 from presentacion.wizard.paginas.pagina_datos_proyecto import PaginaDatosProyecto
@@ -72,37 +63,43 @@ class WizardGeneradorProyectos(QWizard):
     def __init__(
         self,
         controlador: ControladorWizardProyecto | None = None,
+        generar_proyecto: GenerarProyectoMvp | None = None,
         generador_mvp: GenerarProyectoMvp | None = None,
         guardar_preset: GuardarPresetProyecto | None = None,
         cargar_preset: CargarPresetProyecto | None = None,
         guardar_credencial: GuardarCredencial | None = None,
+        catalogo_blueprints: list[tuple[str, str, str]] | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("Generador Base Proyectos")
 
+        if generar_proyecto is None and generador_mvp is not None:
+            generar_proyecto = generador_mvp
+
+        if (
+            generar_proyecto is None
+            or guardar_preset is None
+            or cargar_preset is None
+            or guardar_credencial is None
+            or catalogo_blueprints is None
+        ):
+            from bootstrap.composition_root import crear_contenedor
+
+            contenedor = crear_contenedor()
+            generar_proyecto = generar_proyecto or contenedor.generar_proyecto_mvp
+            guardar_preset = guardar_preset or contenedor.guardar_preset_proyecto
+            cargar_preset = cargar_preset or contenedor.cargar_preset_proyecto
+            guardar_credencial = guardar_credencial or contenedor.guardar_credencial
+            catalogo_blueprints = catalogo_blueprints or contenedor.catalogo_blueprints
+
         self._controlador = controlador or ControladorWizardProyecto()
         self._pool = QThreadPool.globalInstance()
         self._trabajador_activo: TrabajadorGeneracionMvp | None = None
-        self._repositorio_blueprints = RepositorioBlueprintsEnDisco("blueprints")
-        self._descubridor_plugins = DescubridorPlugins("plugins")
-
-        if generador_mvp is None:
-            crear_plan = CrearPlanDesdeBlueprints(
-                self._repositorio_blueprints,
-                descubridor_plugins=self._descubridor_plugins,
-            )
-            generar_manifest = GenerarManifest(CalculadoraHashReal())
-            ejecutar_plan = EjecutarPlan(SistemaArchivosReal(), generar_manifest)
-            sistema_archivos = SistemaArchivosReal()
-            self._generador_mvp = GenerarProyectoMvp(crear_plan, ejecutar_plan, sistema_archivos)
-        else:
-            self._generador_mvp = generador_mvp
-
-        self._guardar_preset = guardar_preset or GuardarPresetProyecto(RepositorioPresetsJson())
-        self._cargar_preset = cargar_preset or CargarPresetProyecto(RepositorioPresetsJson())
-        self._guardar_credencial = guardar_credencial or GuardarCredencial(
-            SelectorRepositorioCredenciales().crear()
-        )
+        self._generador_mvp = generar_proyecto
+        self._guardar_preset = guardar_preset
+        self._cargar_preset = cargar_preset
+        self._guardar_credencial = guardar_credencial
+        self._catalogo_blueprints = catalogo_blueprints
 
         self.especificacion_proyecto = EspecificacionProyecto(nombre_proyecto="", ruta_destino="")
 
@@ -130,7 +127,10 @@ class WizardGeneradorProyectos(QWizard):
         self.pagina_datos.boton_cargar_preset.clicked.connect(self._cargar_preset_desde_ui)
         self.button(QWizard.FinishButton).clicked.connect(self._al_finalizar)
 
-        self._cargar_catalogo_blueprints()
+        self.pagina_persistencia.establecer_blueprints_disponibles(
+            self._catalogo_blueprints,
+            BLUEPRINTS_MVP,
+        )
 
     def _al_finalizar(self) -> None:
         dto = self._controlador.construir_dto(self)
@@ -241,25 +241,6 @@ class WizardGeneradorProyectos(QWizard):
             preset.blueprints,
         )
         self.pagina_resumen.initializePage()
-
-    def _cargar_catalogo_blueprints(self) -> None:
-        internos = [
-            (blueprint.nombre(), blueprint.version(), "Blueprint interno")
-            for blueprint in self._repositorio_blueprints.listar_blueprints()
-        ]
-        externos = [
-            (plugin.nombre, plugin.version, plugin.descripcion)
-            for plugin in self._descubridor_plugins.listar_plugins()
-        ]
-        catalogo_unico: dict[str, tuple[str, str, str]] = {
-            nombre: (nombre, version, descripcion)
-            for nombre, version, descripcion in [*internos, *externos]
-        }
-        self._catalogo_blueprints = sorted(catalogo_unico.values(), key=lambda item: item[0])
-        self.pagina_persistencia.establecer_blueprints_disponibles(
-            self._catalogo_blueprints,
-            BLUEPRINTS_MVP,
-        )
 
     def _blueprints_seleccionados(self) -> list[str]:
         seleccionados = self.pagina_persistencia.blueprints_seleccionados()
