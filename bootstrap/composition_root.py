@@ -8,10 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from aplicacion.casos_uso.actualizar_manifest_patch import ActualizarManifestPatch
-from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado as AuditarProyectoCli
-from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import (
-    AuditarProyectoGenerado as AuditarProyectoWizard,
-)
+from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.crear_plan_patch_desde_blueprints import CrearPlanPatchDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
@@ -53,7 +50,7 @@ class ContenedorAplicacion:
     ejecutar_plan: EjecutarPlan
     actualizar_manifest_patch: ActualizarManifestPatch
     generar_proyecto_mvp: GenerarProyectoMvp
-    auditar_proyecto_generado: AuditarProyectoCli
+    auditar_proyecto_generado: AuditarProyectoGenerado
     guardar_preset_proyecto: GuardarPresetProyecto
     cargar_preset_proyecto: CargarPresetProyecto
     guardar_credencial: GuardarCredencial
@@ -116,13 +113,13 @@ def crear_contenedor() -> ContenedorAplicacion:
     guardar_preset_proyecto = GuardarPresetProyecto(repositorio_presets)
     cargar_preset_proyecto = CargarPresetProyecto(repositorio_presets)
     guardar_credencial = GuardarCredencial(SelectorRepositorioCredenciales().crear())
-    auditar_proyecto_generado = AuditarProyectoCli(ejecutor_procesos)
+    auditar_proyecto_generado = AuditarProyectoGenerado(ejecutor_procesos, calculadora_hash=calculadora_hash)
     generar_proyecto_mvp = GenerarProyectoMvp(
         crear_plan_desde_blueprints=crear_plan_desde_blueprints,
         ejecutar_plan=ejecutar_plan,
         sistema_archivos=sistema_archivos,
         generador_manifest=generador_manifest_mvp,
-        auditor=AuditarProyectoWizard(),
+        auditor=auditar_proyecto_generado,
     )
 
     return ContenedorAplicacion(

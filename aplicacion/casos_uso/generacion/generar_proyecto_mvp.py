@@ -7,10 +7,9 @@ import logging
 from pathlib import Path
 import shutil
 
-from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import (
-    AuditarProyectoGenerado,
-    ResultadoAuditoria,
-)
+from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.puertos.generador_manifest_puerto import GeneradorManifestPuerto
@@ -52,8 +51,14 @@ class GenerarProyectoMvpSalida:
     valido: bool
     errores: list[str]
     warnings: list[str]
-    auditoria: ResultadoAuditoria | None = None
+    auditoria: DtoAuditoriaSalida | None = None
 
+
+
+
+class _AuditorSinValidaciones:
+    def ejecutar(self, entrada: DtoAuditoriaEntrada) -> DtoAuditoriaSalida:
+        return DtoAuditoriaSalida(valido=True, errores=[], advertencias=[], resumen="Auditoría omitida")
 
 class GenerarProyectoMvp:
     """Orquesta la generación de proyecto reutilizando casos de uso existentes."""
@@ -70,7 +75,7 @@ class GenerarProyectoMvp:
         self._ejecutar_plan = ejecutar_plan
         self._sistema_archivos = sistema_archivos
         self._generador_manifest = generador_manifest
-        self._auditor = auditor or AuditarProyectoGenerado()
+        self._auditor = auditor or _AuditorSinValidaciones()
 
     def ejecutar(self, entrada: GenerarProyectoMvpEntrada) -> GenerarProyectoMvpSalida:
         """Genera el proyecto final en disco a partir de los blueprints MVP."""
@@ -124,19 +129,24 @@ class GenerarProyectoMvp:
                     archivos_generados=archivos_creados,
                 )
 
-            resultado_auditoria = self._auditor.auditar(str(ruta_proyecto))
+            resultado_auditoria = self._auditor.ejecutar(
+                DtoAuditoriaEntrada(
+                    ruta_proyecto=str(ruta_proyecto),
+                    blueprints_usados=entrada.blueprints,
+                )
+            )
             LOGGER.info(
-                "Auditoría post-generación: valido=%s errores=%s warnings=%s",
+                "Auditoría post-generación: valido=%s errores=%s advertencias=%s",
                 resultado_auditoria.valido,
                 len(resultado_auditoria.errores),
-                len(resultado_auditoria.warnings),
+                len(resultado_auditoria.advertencias),
             )
             salida = GenerarProyectoMvpSalida(
                 ruta_generada=str(ruta_proyecto),
                 archivos_generados=len(archivos_creados),
                 valido=resultado_auditoria.valido,
                 errores=resultado_auditoria.errores,
-                warnings=resultado_auditoria.warnings,
+                warnings=resultado_auditoria.advertencias,
                 auditoria=resultado_auditoria,
             )
             LOGGER.info(

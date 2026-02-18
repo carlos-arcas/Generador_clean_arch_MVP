@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
@@ -20,6 +22,7 @@ from dominio.modelos import EspecificacionAtributo, EspecificacionClase, Especif
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
 from infraestructura.manifest.generador_manifest import GeneradorManifest
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
+from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
 
 
@@ -47,6 +50,16 @@ ARCHIVOS_CLAVE = [
 BLUEPRINTS_MVP = ["base_clean_arch_v1", "crud_json_v1"]
 
 
+class AuditorSiempreValido:
+    def ejecutar(self, entrada: DtoAuditoriaEntrada) -> DtoAuditoriaSalida:
+        return DtoAuditoriaSalida(valido=True, errores=[], advertencias=[])
+
+
+class EjecutorFalsoAuditoria(EjecutorProcesos):
+    def ejecutar(self, comando: list[str], cwd: str) -> ResultadoProceso:
+        return ResultadoProceso(codigo_salida=0, stdout="TOTAL 100 10 90%", stderr="")
+
+
 def _crear_caso_uso() -> GenerarProyectoMvp:
     sistema_archivos = SistemaArchivosReal()
     return GenerarProyectoMvp(
@@ -54,6 +67,7 @@ def _crear_caso_uso() -> GenerarProyectoMvp:
         ejecutar_plan=EjecutarPlan(sistema_archivos, GenerarManifest(CalculadoraHashReal())),
         sistema_archivos=sistema_archivos,
         generador_manifest=GeneradorManifest(),
+        auditor=AuditorSiempreValido(),
     )
 
 
@@ -100,8 +114,8 @@ def test_generacion_mvp_completa_valida_manifest_y_auditoria(tmp_path: Path) -> 
     assert manifest["clases"] == [{"nombre": "Cliente", "atributos": ["nombre", "edad"]}]
     assert manifest["archivos_generados"] > 0
 
-    auditor = AuditarProyectoGenerado(ejecutar_pytest=False)
-    resultado = auditor.auditar(str(ruta_proyecto))
+    auditor = AuditarProyectoGenerado(EjecutorFalsoAuditoria(), calculadora_hash=CalculadoraHashReal())
+    resultado = auditor.ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(ruta_proyecto)))
     assert resultado.valido is True
     assert resultado.errores == []
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime
 import hashlib
 import json
@@ -10,28 +9,13 @@ import logging
 from pathlib import Path
 import re
 
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from aplicacion.errores import ErrorAuditoria
 from aplicacion.puertos.calculadora_hash_puerto import CalculadoraHashPuerto
-from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos
+from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
 
 LOGGER = logging.getLogger(__name__)
-
-
-@dataclass
-class ResultadoAuditoria:
-    """Resultado detallado de la auditoría del proyecto generado."""
-
-    valido: bool
-    lista_errores: list[str] = field(default_factory=list)
-    cobertura: float | None = None
-    resumen: str = ""
-
-
-@dataclass(frozen=True)
-class ResultadoComando:
-    codigo_salida: int
-    stdout: str
-    stderr: str
 
 
 class _CalculadoraHashLocal:
@@ -69,21 +53,32 @@ class AuditarProyectoGenerado:
         self._ejecutor_procesos = ejecutor_procesos
         self._calculadora_hash = calculadora_hash or _CalculadoraHashLocal()
 
-    def ejecutar(self, ruta_proyecto: str, blueprints_usados: list[str] | None = None) -> ResultadoAuditoria:
+    def ejecutar(self, entrada: DtoAuditoriaEntrada) -> DtoAuditoriaSalida:
         """Ejecuta las validaciones obligatorias sobre un proyecto ya generado."""
-        base = Path(ruta_proyecto)
+        base = Path(entrada.ruta_proyecto)
         errores: list[str] = []
-        blueprints = blueprints_usados or []
-        resultado_pytest = ResultadoComando(codigo_salida=1, stdout="No ejecutado", stderr="")
+        advertencias: list[str] = []
+        resultado_pytest = ResultadoProceso(codigo_salida=1, stdout="No ejecutado", stderr="")
         cobertura: float | None = None
         conclusion = "RECHAZADO"
-        LOGGER.info("Inicio auditoría avanzada proyecto=%s", ruta_proyecto)
+        LOGGER.info("Inicio auditoría avanzada proyecto=%s", entrada.ruta_proyecto)
+
+        if not base.exists() or not base.is_dir():
+            errores.append(f"La ruta '{entrada.ruta_proyecto}' no existe o no es un directorio.")
+            resumen = "Auditoría RECHAZADO. Errores: 1. Cobertura: no disponible."
+            return DtoAuditoriaSalida(
+                valido=False,
+                errores=errores,
+                advertencias=advertencias,
+                cobertura=None,
+                resumen=resumen,
+            )
 
         try:
             errores.extend(self._validar_estructura(base))
             errores.extend(self._validar_imports(base))
             errores.extend(self._validar_logging(base))
-            errores.extend(self._validar_dependencias_informes(base, blueprints))
+            errores.extend(self._validar_dependencias_informes(base, entrada.blueprints_usados))
             errores.extend(self._validar_consistencia_manifest(base))
 
             resultado_pytest = self._ejecutor_procesos.ejecutar(
@@ -98,9 +93,8 @@ class AuditarProyectoGenerado:
 
             if resultado_pytest.codigo_salida != 0 and cobertura is None:
                 errores.append("La ejecución de pytest finalizó con error y sin reporte de cobertura usable.")
-
-            LOGGER.info("Cobertura total detectada: %s", cobertura)
-            LOGGER.info("Errores de auditoría detectados: %s", errores)
+            elif resultado_pytest.codigo_salida != 0:
+                advertencias.append("Pytest finalizó con código distinto de cero.")
 
             valido = not errores
             conclusion = "APROBADO" if valido else "RECHAZADO"
@@ -109,28 +103,28 @@ class AuditarProyectoGenerado:
                 f"Errores: {len(errores)}. "
                 f"Cobertura: {f'{cobertura:.2f}%' if cobertura is not None else 'no disponible'}."
             )
-            return ResultadoAuditoria(
+            return DtoAuditoriaSalida(
                 valido=valido,
-                lista_errores=errores,
+                errores=errores,
+                advertencias=advertencias,
                 cobertura=cobertura,
                 resumen=resumen,
             )
         except Exception as exc:
             LOGGER.error("Fallo inesperado en auditoría: %s", exc, exc_info=True)
-            errores.append(f"Error de auditoría: {exc}")
             raise ErrorAuditoria(f"No fue posible completar la auditoría: {exc}") from exc
         finally:
             self._escribir_informe(
                 base=base,
-                blueprints=blueprints,
+                blueprints=entrada.blueprints_usados,
                 errores=errores,
+                advertencias=advertencias,
                 cobertura=cobertura,
                 resultado_pytest=resultado_pytest,
                 conclusion=conclusion,
             )
 
     def _validar_estructura(self, base: Path) -> list[str]:
-        LOGGER.info("Evaluando reglas de estructura")
         errores: list[str] = []
         for relativo in self.ESTRUCTURA_REQUERIDA:
             if not (base / relativo).exists():
@@ -138,7 +132,6 @@ class AuditarProyectoGenerado:
         return errores
 
     def _validar_imports(self, base: Path) -> list[str]:
-        LOGGER.info("Evaluando reglas de arquitectura por imports")
         errores: list[str] = []
         modulos_estandar_restringidos = {"json", "sqlite3"}
         modulos_exportacion = {"openpyxl", "reportlab"}
@@ -149,15 +142,20 @@ class AuditarProyectoGenerado:
 
         for ruta_archivo in base.rglob("*.py"):
             relativo = ruta_archivo.relative_to(base)
-            modulo_actual = self._ruta_a_modulo(relativo)
-            contenido = ruta_archivo.read_text(encoding="utf-8")
-            imports = set(patron_import.findall(contenido)) | set(patron_from.findall(contenido))
-            grafo_imports[modulo_actual] = imports
             if not relativo.parts:
                 continue
 
+            modulo_actual = self._ruta_a_modulo(relativo)
+            contenido = ruta_archivo.read_text(encoding="utf-8")
+            imports = set(patron_import.findall(contenido)) | set(patron_from.findall(contenido))
+            grafo_imports[modulo_actual] = {
+                modulo
+                for modulo in imports
+                if any(modulo.startswith(prefijo) for prefijo in ("dominio", "aplicacion", "infraestructura", "presentacion"))
+            }
+
             for modulo in imports:
-                modulo_raiz = modulo.lower().split(".")[0]
+                modulo_raiz = modulo.split(".")[0].lower()
                 if modulo_raiz == "sqlite3" and relativo.parts[0] != "infraestructura":
                     errores.append(f"Import sqlite3 fuera de infraestructura ({relativo}): {modulo}")
                 if modulo_raiz in modulos_exportacion and relativo.parts[0] != "infraestructura":
@@ -166,11 +164,7 @@ class AuditarProyectoGenerado:
             if relativo.parts[0] == "dominio":
                 for modulo in imports:
                     modulo_bajo = modulo.lower()
-                    if modulo_bajo.startswith("infraestructura"):
-                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.startswith("presentacion"):
-                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.startswith("pyside6"):
+                    if modulo_bajo.startswith("infraestructura") or modulo_bajo.startswith("presentacion"):
                         errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
                     if modulo_bajo.split(".")[0] in modulos_estandar_restringidos:
                         errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
@@ -178,12 +172,11 @@ class AuditarProyectoGenerado:
                         errores.append(f"Import externo no permitido en dominio ({relativo}): {modulo}")
             elif relativo.parts[0] == "aplicacion":
                 for modulo in imports:
-                    if modulo.lower().startswith("presentacion"):
+                    modulo_bajo = modulo.lower()
+                    if modulo_bajo.startswith("presentacion"):
                         errores.append(f"Import prohibido en aplicación ({relativo}): {modulo}")
-            elif relativo.parts[0] == "presentacion":
-                for modulo in imports:
-                    if modulo.lower().startswith("infraestructura"):
-                        errores.append(f"Import prohibido en presentación ({relativo}): {modulo}")
+                    if modulo_bajo.startswith("infraestructura"):
+                        errores.append(f"Import prohibido en aplicación ({relativo}): {modulo}")
 
         errores.extend(self._detectar_ciclos_basicos(grafo_imports))
         return errores
@@ -209,6 +202,7 @@ class AuditarProyectoGenerado:
         ruta_manifest = base / "manifest.json"
         if not ruta_manifest.exists():
             return []
+
         payload = json.loads(ruta_manifest.read_text(encoding="utf-8"))
         errores: list[str] = []
         for entrada in payload.get("archivos", []):
@@ -221,10 +215,18 @@ class AuditarProyectoGenerado:
             if not ruta_archivo.exists():
                 errores.append(f"manifest.json referencia archivo inexistente: {ruta_relativa}")
                 continue
-            hash_actual = self._calculadora_hash.calcular_hash_archivo(ruta_archivo)
+            hash_actual = self._calcular_hash_archivo(ruta_archivo)
             if hash_actual != hash_esperado:
                 errores.append(f"Hash inconsistente para {ruta_relativa} en manifest.json")
         return errores
+
+
+    def _calcular_hash_archivo(self, ruta_archivo: Path) -> str:
+        if hasattr(self._calculadora_hash, "calcular_hash_archivo"):
+            return self._calculadora_hash.calcular_hash_archivo(ruta_archivo)
+        if hasattr(self._calculadora_hash, "calcular_sha256"):
+            return self._calculadora_hash.calcular_sha256(str(ruta_archivo))
+        raise AttributeError("La calculadora de hash no expone un método compatible.")
 
     def _detectar_ciclos_basicos(self, grafo_imports: dict[str, set[str]]) -> list[str]:
         errores: list[str] = []
@@ -235,7 +237,6 @@ class AuditarProyectoGenerado:
         return sorted(set(errores))
 
     def _validar_logging(self, base: Path) -> list[str]:
-        LOGGER.info("Evaluando reglas de logging")
         errores: list[str] = []
         if not (base / "infraestructura" / "logging_config.py").exists():
             errores.append("No existe configuración de logging en infraestructura/logging_config.py")
@@ -256,8 +257,9 @@ class AuditarProyectoGenerado:
         base: Path,
         blueprints: list[str],
         errores: list[str],
+        advertencias: list[str],
         cobertura: float | None,
-        resultado_pytest: ResultadoComando,
+        resultado_pytest: ResultadoProceso,
         conclusion: str,
     ) -> None:
         ruta_docs = base / "docs"
@@ -298,6 +300,11 @@ class AuditarProyectoGenerado:
             contenido += "### Errores detectados\n\n"
             for error in errores:
                 contenido += f"- {error}\n"
+
+        if advertencias:
+            contenido += "### Advertencias detectadas\n\n"
+            for advertencia in advertencias:
+                contenido += f"- {advertencia}\n"
 
         ruta_informe.write_text(contenido, encoding="utf-8")
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
 
 
@@ -26,7 +27,7 @@ def _crear_estructura_valida(base: Path) -> None:
 def test_auditor_cobertura_90_aprueba(tmp_path: Path) -> None:
     _crear_estructura_valida(tmp_path)
 
-    resultado = AuditarProyectoGenerado(EjecutorMock("TOTAL 100 10 90%")).ejecutar(str(tmp_path))
+    resultado = AuditarProyectoGenerado(EjecutorMock("TOTAL 100 10 90%")).ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(tmp_path)))
 
     assert resultado.valido is True
     assert resultado.cobertura == 90.0
@@ -35,7 +36,7 @@ def test_auditor_cobertura_90_aprueba(tmp_path: Path) -> None:
 def test_auditor_cobertura_70_rechaza(tmp_path: Path) -> None:
     _crear_estructura_valida(tmp_path)
 
-    resultado = AuditarProyectoGenerado(EjecutorMock("TOTAL 100 30 70%")).ejecutar(str(tmp_path))
+    resultado = AuditarProyectoGenerado(EjecutorMock("TOTAL 100 30 70%")).ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(tmp_path)))
 
     assert resultado.valido is False
-    assert any("Cobertura insuficiente" in error for error in resultado.lista_errores)
+    assert any("Cobertura insuficiente" in error for error in resultado.errores)

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
 
 
@@ -28,14 +29,14 @@ def _crear_estructura_minima(base: Path) -> None:
 def test_auditar_proyecto_valido(tmp_path: Path) -> None:
     _crear_estructura_minima(tmp_path)
 
-    resultado = AuditarProyectoGenerado(EjecutorFalso()).ejecutar(str(tmp_path))
+    resultado = AuditarProyectoGenerado(EjecutorFalso()).ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(tmp_path)))
 
     assert resultado.valido is True
-    assert resultado.lista_errores == []
+    assert resultado.errores == []
 
 
 def test_auditar_proyecto_con_faltantes(tmp_path: Path) -> None:
-    resultado = AuditarProyectoGenerado(EjecutorFalso()).ejecutar(str(tmp_path))
+    resultado = AuditarProyectoGenerado(EjecutorFalso()).ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(tmp_path)))
 
     assert resultado.valido is False
-    assert len(resultado.lista_errores) >= 10
+    assert len(resultado.errores) >= 10

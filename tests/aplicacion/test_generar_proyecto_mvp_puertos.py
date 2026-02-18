@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import ResultadoAuditoria
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
@@ -49,10 +50,10 @@ class AuditorFalso:
     def __init__(self, valido: bool = True) -> None:
         self._valido = valido
 
-    def auditar(self, ruta_proyecto: str) -> ResultadoAuditoria:
+    def ejecutar(self, entrada: DtoAuditoriaEntrada) -> DtoAuditoriaSalida:
         if self._valido:
-            return ResultadoAuditoria(errores=[], warnings=[])
-        return ResultadoAuditoria(errores=["error"], warnings=[])
+            return DtoAuditoriaSalida(valido=True, errores=[], advertencias=[])
+        return DtoAuditoriaSalida(valido=False, errores=["error"], advertencias=[])
 
 
 def _entrada(tmp_path: Path, blueprints: list[str] | None = None) -> GenerarProyectoMvpEntrada:

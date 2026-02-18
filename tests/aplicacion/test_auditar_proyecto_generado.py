@@ -7,6 +7,7 @@ import pytest
 from pathlib import Path
 
 from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
 from aplicacion.errores import ErrorAuditoria
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
 
@@ -61,7 +62,7 @@ def test_auditar_proyecto_ok_con_hash_inyectado(tmp_path: Path) -> None:
     resultado = AuditarProyectoGenerado(
         ejecutor_procesos=EjecutorFalso(),
         calculadora_hash=CalculadoraHashFalsa(),
-    ).ejecutar(str(tmp_path))
+    ).ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(tmp_path)))
 
     assert resultado.valido is True
 
@@ -79,7 +80,7 @@ def test_auditar_proyecto_error_si_falla_puerto_hash(tmp_path: Path) -> None:
         AuditarProyectoGenerado(
             ejecutor_procesos=EjecutorFalso(),
             calculadora_hash=CalculadoraHashFalsa(forzar_error=True),
-        ).ejecutar(str(tmp_path))
+        ).ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(tmp_path)))
 
 
 def test_auditar_proyecto_limite_manifest_sin_archivos(tmp_path: Path) -> None:
@@ -89,6 +90,6 @@ def test_auditar_proyecto_limite_manifest_sin_archivos(tmp_path: Path) -> None:
     resultado = AuditarProyectoGenerado(
         ejecutor_procesos=EjecutorFalso(),
         calculadora_hash=CalculadoraHashFalsa(),
-    ).ejecutar(str(tmp_path))
+    ).ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(tmp_path)))
 
     assert resultado.valido is True
