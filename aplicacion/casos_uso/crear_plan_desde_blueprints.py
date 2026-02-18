@@ -7,9 +7,19 @@ import logging
 from aplicacion.errores import ErrorBlueprintNoEncontrado, ErrorConflictoArchivos, ErrorValidacion
 from aplicacion.puertos.blueprint import RepositorioBlueprints
 from dominio.modelos import ErrorValidacionDominio, EspecificacionProyecto, PlanGeneracion
-from infraestructura.plugins.descubridor_plugins import DescubridorPlugins
+from aplicacion.puertos.descubridor_plugins_puerto import DescubridorPluginsPuerto
 
 LOGGER = logging.getLogger(__name__)
+
+
+class _DescubridorPluginsNulo:
+    """Implementación por defecto mientras se completa el composition root."""
+
+    def descubrir(self, ruta):  # type: ignore[no-untyped-def]
+        return []
+
+    def cargar_plugin(self, nombre: str):
+        raise ValueError(f"Plugin no encontrado: {nombre}")
 
 
 class CrearPlanDesdeBlueprints:
@@ -18,10 +28,10 @@ class CrearPlanDesdeBlueprints:
     def __init__(
         self,
         repositorio_blueprints: RepositorioBlueprints,
-        descubridor_plugins: DescubridorPlugins | None = None,
+        descubridor_plugins: DescubridorPluginsPuerto | None = None,
     ) -> None:
         self._repositorio = repositorio_blueprints
-        self._descubridor_plugins = descubridor_plugins or DescubridorPlugins()
+        self._descubridor_plugins = descubridor_plugins or _DescubridorPluginsNulo()
 
     def ejecutar(
         self, especificacion: EspecificacionProyecto, nombres_blueprints: list[str]
@@ -62,7 +72,8 @@ class CrearPlanDesdeBlueprints:
         except ValueError as exc:
             raise ErrorBlueprintNoEncontrado(str(exc)) from exc
 
-        compatibilidades = set(plugin.metadata.compatible_con)
+        metadata = getattr(plugin, "metadata", None)
+        compatibilidades = set(getattr(metadata, "compatible_con", []))
         if compatibilidades and not compatibilidades.intersection(set(seleccionados)):
             raise ErrorValidacion(
                 f"Plugin incompatible '{nombre_blueprint}': requiere alguno de {sorted(compatibilidades)}"

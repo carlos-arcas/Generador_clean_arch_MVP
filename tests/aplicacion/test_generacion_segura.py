@@ -15,6 +15,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
 )
 from dominio.excepciones.proyecto_ya_existe_error import ProyectoYaExisteError
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
+from infraestructura.manifest.generador_manifest import GeneradorManifest
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
 
@@ -48,6 +49,7 @@ def test_generacion_normal_crea_manifest_configuracion(tmp_path: Path) -> None:
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlan(SistemaArchivosReal()),
         sistema_archivos=SistemaArchivosReal(),
+        generador_manifest=GeneradorManifest(),
     )
 
     salida = caso_uso.ejecutar(_entrada(tmp_path))
@@ -68,6 +70,7 @@ def test_carpeta_existente_no_vacia_lanza_proyecto_ya_existe_error(tmp_path: Pat
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlan(SistemaArchivosReal()),
         sistema_archivos=SistemaArchivosReal(),
+        generador_manifest=GeneradorManifest(),
     )
 
     with pytest.raises(ProyectoYaExisteError):
@@ -79,6 +82,7 @@ def test_rollback_elimina_carpeta_cuando_hay_fallo_interno(tmp_path: Path) -> No
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlanFalla(),
         sistema_archivos=SistemaArchivosReal(),
+        generador_manifest=GeneradorManifest(),
     )
 
     salida = caso_uso.ejecutar(_entrada(tmp_path))
