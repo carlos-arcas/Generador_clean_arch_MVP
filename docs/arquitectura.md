@@ -26,3 +26,50 @@ El `WizardGeneradorProyectos` delega la preparación de datos a `ControladorWiza
 - `EjecutarPlan`
 - `AuditarProyectoGenerado`
 - Puertos de blueprints, manifest, sistema de archivos, hash y presets.
+
+## Guardarraíles automáticos de arquitectura
+Para evitar regresiones en dependencias entre capas, el proyecto incluye una prueba automática en:
+
+- `tests/arquitectura/test_dependencias_capas.py`
+
+Esta prueba recorre los archivos Python del repositorio y valida las siguientes reglas:
+
+1. **Regla 1**: `aplicacion/` no puede importar `infraestructura`.
+2. **Regla 2**: `dominio/` no puede importar `aplicacion`, `infraestructura` ni `presentacion`.
+3. **Regla 3**: `presentacion/` no puede importar `infraestructura`, salvo `infraestructura.bootstrap`.
+
+Exclusiones del recorrido:
+
+- `tests/`
+- `.venv/`
+- `__pycache__/`
+- `infraestructura/bootstrap.py`
+
+- Excepciones temporales controladas (deuda técnica existente):
+  - `presentacion/wizard_proyecto.py`
+  - `aplicacion/casos_uso/crear_plan_desde_blueprints.py`
+  - `aplicacion/casos_uso/auditar_proyecto_generado.py`
+  - `aplicacion/casos_uso/generacion/generar_proyecto_mvp.py`
+
+### Ejecución
+Para ejecutar solo este guardarraíl:
+
+- `pytest -q tests/arquitectura/test_dependencias_capas.py`
+
+Para ejecutar toda la suite:
+
+- `pytest -q`
+
+Para validar cobertura mínima:
+
+- `pytest --cov=. --cov-fail-under=85`
+
+### Qué ocurre ante una violación
+Si se detecta una importación prohibida, la prueba falla indicando de forma explícita:
+
+- archivo infractor
+- número de línea
+- regla violada
+- línea detectada
+
+De esta forma, la arquitectura se valida de manera ejecutable en cada ejecución de tests.
