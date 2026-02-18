@@ -67,7 +67,7 @@ def test_wizard_finalizar_dispara_caso_uso_y_bloquea_botones(
     wizard._al_finalizar()
 
     assert len(generador_doble.entradas) == 1
-    assert generador_doble.entradas[0].blueprints == ["base_clean_arch_v1", "crud_json_v1"]
+    assert generador_doble.entradas[0].blueprints == ["base_clean_arch", "crud_json"]
     assert estados_durante_start == [(False, False, False)]
     assert wizard.button(wizard.BackButton).isEnabled() is True
     assert wizard.button(wizard.NextButton).isEnabled() is True

@@ -38,7 +38,7 @@ def test_wizard_aplica_preset_y_refresca_campos(app_qt: QApplication) -> None:
                 )
             ],
         ),
-        blueprints=["base_clean_arch_v1", "crud_json_v1"],
+        blueprints=["base_clean_arch", "crud_json"],
         metadata={"persistencia": "SQLite"},
     )
 

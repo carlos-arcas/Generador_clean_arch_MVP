@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.0] - 2026-02-18
+
+### Añadido
+- Soporte de plugins externos dinámicos.
+
+
 ## [1.4.0] - 2026-02-18
 
 ### Añadido
