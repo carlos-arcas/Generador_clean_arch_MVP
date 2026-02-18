@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.0] - 2026-02-18
+
+### Añadido
+- Gestión segura de credenciales con almacenamiento protegido.
+
 ## [1.5.1] - 2026-02-18
 
 ### Corregido
