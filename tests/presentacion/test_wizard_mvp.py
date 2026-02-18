@@ -11,6 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 QtWidgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 QApplication = QtWidgets.QApplication
 
+from presentacion.wizard.modelos.modelo_clases_temporal import AtributoTemporal, ClaseTemporal
 from presentacion.wizard.paginas.pagina_resumen import PaginaResumen
 from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
 
@@ -65,9 +66,11 @@ def test_pagina_resumen_contiene_nombre_y_persistencia(app_qt: QApplication) -> 
         ruta="/tmp/inventario",
         descripcion="Sistema de inventario",
         version="1.0.1",
-        clases=["Producto"],
+        clases=[ClaseTemporal(nombre="Producto", atributos=[AtributoTemporal(nombre="id", tipo="int", obligatorio=True)])],
         persistencia="SQLite",
     )
 
     assert "Inventario" in resumen
     assert "Persistencia: SQLite" in resumen
+    assert "Clase: Producto" in resumen
+    assert "id: int (obligatorio)" in resumen

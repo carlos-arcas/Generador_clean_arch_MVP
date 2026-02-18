@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.2] - 2026-02-18
+
+### Añadido
+- Soporte de atributos dinámicos por clase en wizard.
+
 ## [1.0.1] - 2026-02-18
 
 ### Añadido

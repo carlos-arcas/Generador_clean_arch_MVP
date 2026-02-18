@@ -25,7 +25,7 @@ class ControladorWizardProyecto:
             ruta=wizard.pagina_datos.campo_ruta.text().strip(),
             descripcion=wizard.pagina_datos.campo_descripcion.text().strip(),
             version=wizard.pagina_datos.campo_version.text().strip(),
-            clases=wizard.pagina_clases.clases(),
+            clases=wizard.pagina_clases.clases_temporales(),
             persistencia=wizard.pagina_persistencia.persistencia_seleccionada(),
         )
 
