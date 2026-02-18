@@ -7,6 +7,7 @@ import logging
 
 from PySide6.QtWidgets import QMessageBox, QWizard
 
+from dominio.modelos import EspecificacionProyecto
 from presentacion.wizard.dtos import DatosWizardProyecto
 from presentacion.wizard.paginas.pagina_clases import PaginaClases
 from presentacion.wizard.paginas.pagina_datos_proyecto import PaginaDatosProyecto
@@ -20,12 +21,16 @@ class ControladorWizardProyecto:
     """Orquesta la recopilación de datos del wizard para siguientes pasos."""
 
     def construir_dto(self, wizard: "WizardGeneradorProyectos") -> DatosWizardProyecto:
+        wizard.especificacion_proyecto.nombre_proyecto = wizard.pagina_datos.campo_nombre.text().strip()
+        wizard.especificacion_proyecto.ruta_destino = wizard.pagina_datos.campo_ruta.text().strip()
+        wizard.especificacion_proyecto.descripcion = wizard.pagina_datos.campo_descripcion.text().strip()
+        wizard.especificacion_proyecto.version = wizard.pagina_datos.campo_version.text().strip()
         return DatosWizardProyecto(
             nombre=wizard.pagina_datos.campo_nombre.text().strip(),
             ruta=wizard.pagina_datos.campo_ruta.text().strip(),
             descripcion=wizard.pagina_datos.campo_descripcion.text().strip(),
             version=wizard.pagina_datos.campo_version.text().strip(),
-            clases=wizard.pagina_clases.clases_temporales(),
+            especificacion_proyecto=wizard.especificacion_proyecto,
             persistencia=wizard.pagina_persistencia.persistencia_seleccionada(),
         )
 
@@ -38,6 +43,7 @@ class WizardGeneradorProyectos(QWizard):
         self.setWindowTitle("Generador Base Proyectos")
 
         self._controlador = controlador or ControladorWizardProyecto()
+        self.especificacion_proyecto = EspecificacionProyecto(nombre_proyecto="", ruta_destino="")
 
         self.pagina_datos = PaginaDatosProyecto()
         self.pagina_clases = PaginaClases()
