@@ -40,6 +40,7 @@ class PaginaClases(QWizardPage):
         super().__init__()
         self.setTitle("Clases")
         self.setSubTitle("Añade clases y sus atributos iniciales.")
+        self._estado_complete = self.isComplete()
 
         self._campo_nombre_clase = QLineEdit()
         self._campo_nombre_clase.setPlaceholderText("Nombre de clase")
@@ -132,7 +133,7 @@ class PaginaClases(QWizardPage):
         self._campo_nombre_clase.clear()
         self._lista_clases.setCurrentRow(self._lista_clases.count() - 1)
         LOGGER.debug("Clase añadida: %s", nombre_limpio)
-        self.completeChanged.emit()
+        self._emitir_cambio_completitud()
         return True
 
     def eliminar_clase_seleccionada(self) -> bool:
@@ -144,7 +145,7 @@ class PaginaClases(QWizardPage):
         indice = self._lista_clases.currentRow()
         self._lista_clases.takeItem(indice)
         LOGGER.debug("Clase eliminada: %s", clase.nombre)
-        self.completeChanged.emit()
+        self._emitir_cambio_completitud()
         return True
 
     def anadir_atributo_desde_input(self) -> bool:
@@ -265,3 +266,14 @@ class PaginaClases(QWizardPage):
         if not isinstance(especificacion, EspecificacionProyecto):
             raise RuntimeError("El wizard no contiene una especificación de proyecto válida.")
         return especificacion
+
+    def _emitir_cambio_completitud(self) -> None:
+        estado_actual = self.isComplete()
+        if estado_actual != self._estado_complete:
+            LOGGER.debug(
+                "Completitud en página de clases actualizada: %s -> %s",
+                self._estado_complete,
+                estado_actual,
+            )
+            self._estado_complete = estado_actual
+        self.completeChanged.emit()
