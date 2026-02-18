@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -21,6 +20,8 @@ from PySide6.QtWidgets import (
 )
 
 from aplicacion.dtos.proyecto import DtoAtributo, DtoClase
+from presentacion.wizard.servicios_ui.servicio_dialogos import ServicioDialogos
+from presentacion.wizard.servicios_ui.servicio_validaciones_ui import ServicioValidacionesUi
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,6 +36,8 @@ class PaginaClases(QWizardPage):
         self.setTitle("Clases")
         self.setSubTitle("Añade clases y sus atributos iniciales.")
         self._clases_dto: list[DtoClase] = []
+        self._dialogos = ServicioDialogos()
+        self._validador_ui = ServicioValidacionesUi()
 
         self._campo_nombre_clase = QLineEdit()
         self._campo_nombre_clase.setPlaceholderText("Nombre de clase")
@@ -116,7 +119,7 @@ class PaginaClases(QWizardPage):
             return False
 
         if any(clase.nombre == nombre_limpio for clase in self._clases_dto):
-            QMessageBox.critical(self, "Error de validación", f"Ya existe una clase con nombre '{nombre_limpio}'.")
+            self._dialogos.error(self, "Error de validación", f"Ya existe una clase con nombre '{nombre_limpio}'.")
             return False
 
         self._clases_dto.append(DtoClase(nombre=nombre_limpio))
@@ -162,7 +165,7 @@ class PaginaClases(QWizardPage):
             return False
 
         if any(atributo.nombre == nombre_limpio for atributo in clase.atributos):
-            QMessageBox.critical(self, "Error de validación", f"Ya existe un atributo con nombre '{nombre_limpio}'.")
+            self._dialogos.error(self, "Error de validación", f"Ya existe un atributo con nombre '{nombre_limpio}'.")
             return False
 
         atributos = [
@@ -226,9 +229,9 @@ class PaginaClases(QWizardPage):
         self._lista_clases.setCurrentRow(-1)
 
     def _normalizar_nombre(self, valor: str) -> str | None:
-        nombre = valor.strip()
-        if not nombre:
-            QMessageBox.critical(self, "Error de validación", "El nombre no puede estar vacío.")
+        nombre = self._validador_ui.normalizar_nombre(valor)
+        if nombre is None:
+            self._dialogos.error(self, "Error de validación", "El nombre no puede estar vacío.")
             return None
         return nombre
 

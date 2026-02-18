@@ -2,51 +2,35 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-import json
 import logging
 from pathlib import Path
 import re
 import subprocess
 
+from aplicacion.casos_uso.auditoria.generador_reporte_auditoria import (
+    GeneradorReporteAuditoria,
+    ResultadoAuditoria,
+)
+from aplicacion.casos_uso.auditoria.validador_estructura import ValidadorEstructura
+from aplicacion.casos_uso.auditoria.verificador_hashes import VerificadorHashes
+
 LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class ResultadoAuditoria:
-    """Resultado de la auditoría automática post-generación."""
-
-    errores: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-
-    @property
-    def valido(self) -> bool:
-        return not self.errores
-
-
 class AuditarProyectoGenerado:
-    """Valida estructura mínima e integridad básica del proyecto generado."""
+    """Orquesta validaciones de estructura, integridad y dependencias por capas."""
 
-    CARPETAS_OBLIGATORIAS = [
-        "dominio",
-        "aplicacion",
-        "infraestructura",
-        "presentacion",
-        "tests",
-        "docs",
-        "logs",
-        "configuracion",
-        "scripts",
-    ]
-
-    ARCHIVOS_OBLIGATORIOS = [
-        "VERSION",
-        "CHANGELOG.md",
-        "requirements.txt",
-    ]
-
-    def __init__(self, ejecutar_pytest: bool = False) -> None:
+    def __init__(
+        self,
+        ejecutar_pytest: bool = False,
+        validador_estructura: ValidadorEstructura | None = None,
+        verificador_hashes: VerificadorHashes | None = None,
+        generador_reporte: GeneradorReporteAuditoria | None = None,
+    ) -> None:
         self._ejecutar_pytest = ejecutar_pytest
+        self._validador_estructura = validador_estructura or ValidadorEstructura()
+        self._verificador_hashes = verificador_hashes or VerificadorHashes()
+        self._generador_reporte = generador_reporte or GeneradorReporteAuditoria()
 
     def auditar(self, ruta_proyecto: str) -> ResultadoAuditoria:
         """Ejecuta la auditoría del proyecto generado."""
@@ -55,11 +39,13 @@ class AuditarProyectoGenerado:
         warnings: list[str] = []
 
         if not base.exists() or not base.is_dir():
-            return ResultadoAuditoria(errores=[f"La ruta '{ruta_proyecto}' no existe o no es un directorio."])
+            return self._generador_reporte.generar(
+                errores=[f"La ruta '{ruta_proyecto}' no existe o no es un directorio."],
+                warnings=[],
+            )
 
-        errores.extend(self._validar_estructura(base))
-        errores.extend(self._validar_archivos(base))
-        errores.extend(self._validar_manifest(base))
+        errores.extend(self._validador_estructura.validar(base))
+        errores.extend(self._verificador_hashes.verificar(base))
         errores.extend(self._validar_dependencias_capas(base))
 
         if self._ejecutar_pytest:
@@ -76,37 +62,7 @@ class AuditarProyectoGenerado:
         for warning in warnings:
             LOGGER.warning("AUDIT WARNING: %s", warning)
 
-        return ResultadoAuditoria(errores=errores, warnings=warnings)
-
-    def _validar_estructura(self, base: Path) -> list[str]:
-        errores: list[str] = []
-        for carpeta in self.CARPETAS_OBLIGATORIAS:
-            if not (base / carpeta).is_dir():
-                errores.append(f"No existe la carpeta obligatoria: {carpeta}")
-        return errores
-
-    def _validar_archivos(self, base: Path) -> list[str]:
-        errores: list[str] = []
-        for archivo in self.ARCHIVOS_OBLIGATORIOS:
-            if not (base / archivo).is_file():
-                errores.append(f"No existe el archivo obligatorio: {archivo}")
-        return errores
-
-    def _validar_manifest(self, base: Path) -> list[str]:
-        candidatos = [base / "MANIFEST.json", base / "configuracion" / "MANIFEST.json", base / "manifest.json"]
-        ruta_manifest = next((ruta for ruta in candidatos if ruta.exists()), None)
-        if ruta_manifest is None:
-            return ["No existe MANIFEST requerido: MANIFEST.json"]
-
-        try:
-            payload = json.loads(ruta_manifest.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            return [f"{ruta_manifest.name} no es un JSON válido: {exc}"]
-
-        if not isinstance(payload, dict):
-            return [f"{ruta_manifest.name} debe contener un objeto JSON en raíz."]
-
-        return []
+        return self._generador_reporte.generar(errores=errores, warnings=warnings)
 
     def _validar_dependencias_capas(self, base: Path) -> list[str]:
         errores: list[str] = []
@@ -133,13 +89,9 @@ class AuditarProyectoGenerado:
                     modulo_normalizado.startswith("infraestructura")
                     or modulo_normalizado.startswith("presentacion")
                 ):
-                    errores.append(
-                        f"Import prohibido en dominio ({relativo}): {modulo}"
-                    )
+                    errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
                 if capa == "aplicacion" and modulo_normalizado.startswith("presentacion"):
-                    errores.append(
-                        f"Import prohibido en aplicacion ({relativo}): {modulo}"
-                    )
+                    errores.append(f"Import prohibido en aplicacion ({relativo}): {modulo}")
         return errores
 
     def _ejecutar_pytest_opcional(self, base: Path) -> list[str]:
