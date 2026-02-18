@@ -10,8 +10,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 QtWidgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 QApplication = QtWidgets.QApplication
-QMessageBox = QtWidgets.QMessageBox
-
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvpSalida
 from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
 
@@ -48,7 +46,7 @@ def test_wizard_finalizar_dispara_caso_uso_y_bloquea_botones(
     wizard.pagina_datos.campo_nombre.setText("MiProyecto")
     wizard.pagina_datos.campo_ruta.setText("/tmp/mi_proyecto")
     wizard.pagina_clases.anadir_clase("Cliente")
-    monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: QMessageBox.Ok)
+    monkeypatch.setattr(wizard, "_mostrar_dialogo_exito", lambda *_args, **_kwargs: None)
 
     estados_durante_start: list[tuple[bool, bool, bool]] = []
 

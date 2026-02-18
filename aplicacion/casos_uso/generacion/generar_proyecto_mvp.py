@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 import shutil
+from typing import Callable
 
 from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import (
     AuditarProyectoGenerado,
@@ -53,6 +54,11 @@ class GenerarProyectoMvpSalida:
     errores: list[str]
     warnings: list[str]
     auditoria: ResultadoAuditoria | None = None
+    cancelado: bool = False
+
+
+class CancelacionGeneracionError(Exception):
+    """Indica que la generación fue cancelada por el usuario."""
 
 
 class GenerarProyectoMvp:
@@ -72,7 +78,12 @@ class GenerarProyectoMvp:
         self._generador_manifest = generador_manifest or GeneradorManifest()
         self._auditor = auditor or AuditarProyectoGenerado()
 
-    def ejecutar(self, entrada: GenerarProyectoMvpEntrada) -> GenerarProyectoMvpSalida:
+    def ejecutar(
+        self,
+        entrada: GenerarProyectoMvpEntrada,
+        reportar_progreso: Callable[[str], None] | None = None,
+        debe_cancelar: Callable[[], bool] | None = None,
+    ) -> GenerarProyectoMvpSalida:
         """Genera el proyecto final en disco a partir de los blueprints MVP."""
         LOGGER.info(
             "Iniciando generación MVP para proyecto='%s' destino='%s' blueprints=%s",
@@ -83,9 +94,17 @@ class GenerarProyectoMvp:
         ruta_proyecto = Path(entrada.ruta_destino) / entrada.nombre_proyecto
         carpeta_existia = ruta_proyecto.exists()
         carpeta_creada_en_ejecucion = False
+        reportar = reportar_progreso or (lambda *_: None)
+        cancelar = debe_cancelar or (lambda: False)
+
+        def _cancelar_si_corresponde() -> None:
+            if cancelar():
+                raise CancelacionGeneracionError("Generación cancelada por el usuario.")
 
         try:
+            reportar("Validando ruta destino...")
             self._validar_ruta_destino(ruta_proyecto)
+            _cancelar_si_corresponde()
             if not carpeta_existia:
                 ruta_proyecto.mkdir(parents=True, exist_ok=False)
                 carpeta_creada_en_ejecucion = True
@@ -101,13 +120,17 @@ class GenerarProyectoMvp:
             ]
             LOGGER.debug("Blueprints normalizados para ejecución: %s", blueprints_normalizados)
 
+            reportar("Creando plan...")
             LOGGER.info("Etapa 1/3: asegurando estructura mínima de directorios")
             for directorio in DIRECTORIOS_BASE_MVP:
                 self._sistema_archivos.asegurar_directorio(f"{ruta_proyecto}/{directorio}")
+            _cancelar_si_corresponde()
 
             LOGGER.info("Etapa 2/3: creando plan compuesto")
             plan = self._crear_plan.ejecutar(especificacion, blueprints_normalizados)
+            _cancelar_si_corresponde()
 
+            reportar("Ejecutando plan...")
             LOGGER.info("Etapa 3/3: ejecutando plan en disco")
             archivos_creados = self._ejecutar_plan.ejecutar(
                 plan=plan,
@@ -116,13 +139,18 @@ class GenerarProyectoMvp:
                 blueprints_usados=[f"{nombre}@1.0.0" for nombre in blueprints_normalizados],
                 generar_manifest=True,
             )
+            _cancelar_si_corresponde()
+
+            reportar("Generando manifest...")
             self._generador_manifest.generar(
                 ruta_proyecto=str(ruta_proyecto),
                 especificacion_proyecto=especificacion,
                 blueprints=entrada.blueprints,
                 archivos_generados=archivos_creados,
             )
+            _cancelar_si_corresponde()
 
+            reportar("Ejecutando auditoría...")
             resultado_auditoria = self._auditor.auditar(str(ruta_proyecto))
             LOGGER.info(
                 "Auditoría post-generación: valido=%s errores=%s warnings=%s",
@@ -143,9 +171,22 @@ class GenerarProyectoMvp:
                 salida.ruta_generada,
                 salida.archivos_generados,
             )
+            reportar("Finalizado")
             return salida
         except ProyectoYaExisteError:
             raise
+        except CancelacionGeneracionError as exc:
+            if carpeta_creada_en_ejecucion and ruta_proyecto.exists():
+                shutil.rmtree(ruta_proyecto)
+                LOGGER.info("Rollback por cancelación: eliminado directorio '%s'", ruta_proyecto)
+            return GenerarProyectoMvpSalida(
+                ruta_generada=str(ruta_proyecto),
+                archivos_generados=0,
+                valido=False,
+                errores=[str(exc)],
+                warnings=[],
+                cancelado=True,
+            )
         except Exception as exc:
             if carpeta_creada_en_ejecucion and ruta_proyecto.exists():
                 shutil.rmtree(ruta_proyecto)
