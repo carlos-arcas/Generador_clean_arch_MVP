@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0] - 2026-02-18
+
+### Mejorado
+- UX de generación con progreso por etapas.
+- Cancelación segura.
+- Mensajes de resultado mejorados.
+
+
 ## [1.5.1] - 2026-02-18
 
 ### Corregido

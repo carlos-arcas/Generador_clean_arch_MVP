@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import logging
+from pathlib import Path
+import traceback
 
-from PySide6.QtCore import QThreadPool
+from PySide6.QtCore import QThreadPool, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QMessageBox,
     QProgressBar,
+    QPushButton,
     QVBoxLayout,
     QWizard,
 )
@@ -111,11 +115,15 @@ class WizardGeneradorProyectos(QWizard):
         self._barra_progreso = QProgressBar()
         self._barra_progreso.setRange(0, 0)
         self._barra_progreso.hide()
+        self._boton_cancelar_generacion = QPushButton("Cancelar generación")
+        self._boton_cancelar_generacion.hide()
+        self._boton_cancelar_generacion.clicked.connect(self._cancelar_generacion)
 
         layout = self.layout()
         if isinstance(layout, QVBoxLayout):
             layout.addWidget(self._etiqueta_estado)
             layout.addWidget(self._barra_progreso)
+            layout.addWidget(self._boton_cancelar_generacion)
 
         self.pagina_datos.boton_guardar_preset.clicked.connect(self._guardar_preset_desde_ui)
         self.pagina_datos.boton_cargar_preset.clicked.connect(self._cargar_preset_desde_ui)
@@ -124,23 +132,27 @@ class WizardGeneradorProyectos(QWizard):
         self._cargar_catalogo_blueprints()
 
     def _al_finalizar(self) -> None:
-        dto = self._controlador.construir_dto(self)
-        LOGGER.info("Configuración wizard lista: %s", asdict(dto))
+        try:
+            dto = self._controlador.construir_dto(self)
+            LOGGER.info("Configuración wizard lista: %s", asdict(dto))
 
-        entrada = GenerarProyectoMvpEntrada(
-            especificacion_proyecto=dto.especificacion_proyecto,
-            ruta_destino=dto.ruta,
-            nombre_proyecto=dto.nombre,
-            blueprints=self._blueprints_seleccionados(),
-        )
-        self._cambiar_estado_generando(True, "Generando...")
+            entrada = GenerarProyectoMvpEntrada(
+                especificacion_proyecto=dto.especificacion_proyecto,
+                ruta_destino=dto.ruta,
+                nombre_proyecto=dto.nombre,
+                blueprints=self._blueprints_seleccionados(),
+            )
+            self._cambiar_estado_generando(True, "Validando ruta destino...")
 
-        trabajador = TrabajadorGeneracionMvp(caso_uso=self._generador_mvp, entrada=entrada)
-        trabajador.senales.progreso.connect(self._actualizar_estado)
-        trabajador.senales.exito.connect(self._on_generacion_exitosa)
-        trabajador.senales.error.connect(self._on_generacion_error)
-        self._trabajador_activo = trabajador
-        self._pool.start(trabajador)
+            trabajador = TrabajadorGeneracionMvp(caso_uso=self._generador_mvp, entrada=entrada)
+            trabajador.senales.progreso.connect(self._actualizar_estado)
+            trabajador.senales.exito.connect(self._on_generacion_exitosa)
+            trabajador.senales.cancelado.connect(self._on_generacion_cancelada)
+            trabajador.senales.error.connect(self._on_generacion_error)
+            self._trabajador_activo = trabajador
+            self._pool.start(trabajador)
+        except Exception as exc:  # noqa: BLE001
+            self._manejar_excepcion_visual(exc, "No se pudo iniciar la generación.")
 
     def _guardar_preset_desde_ui(self) -> None:
         nombre, aceptado = QInputDialog.getText(self, "Guardar preset", "Nombre del preset")
@@ -243,8 +255,18 @@ class WizardGeneradorProyectos(QWizard):
         self.button(QWizard.FinishButton).setEnabled(not activo)
         self._etiqueta_estado.setText(texto)
         self._barra_progreso.setVisible(activo)
+        self._boton_cancelar_generacion.setVisible(activo)
+        self._boton_cancelar_generacion.setEnabled(activo)
+
+    def _cancelar_generacion(self) -> None:
+        if self._trabajador_activo is None:
+            return
+        self._trabajador_activo.cancelar()
+        self._boton_cancelar_generacion.setEnabled(False)
+        self._actualizar_estado("Cancelando generación...")
 
     def _on_generacion_exitosa(self, salida: GenerarProyectoMvpSalida) -> None:
+        self._trabajador_activo = None
         self._cambiar_estado_generando(False, "")
         LOGGER.info(
             "Generación completada en wizard: ruta=%s archivos=%s valido=%s errores=%s warnings=%s",
@@ -254,28 +276,69 @@ class WizardGeneradorProyectos(QWizard):
             len(salida.errores),
             len(salida.warnings),
         )
-        mensaje = (
-            "Proyecto generado correctamente.\n"
-            "Auditoría:\n"
-            f"   Errores: {len(salida.errores)}\n"
-            f"   Warnings: {len(salida.warnings)}"
-        )
-        if salida.valido:
-            QMessageBox.information(self, "Generación completada", mensaje)
+
+        if not salida.valido:
+            self._mostrar_error_generacion()
             return
 
-        detalle = "\n".join(salida.errores) if salida.errores else "Sin detalles adicionales"
-        QMessageBox.warning(
-            self,
-            "Generación completada con observaciones",
-            f"{mensaje}\n\nSe detectaron errores críticos de auditoría:\n{detalle}",
-        )
+        self._mostrar_dialogo_exito(salida)
+
+    def _on_generacion_cancelada(self, mensaje: str) -> None:
+        self._trabajador_activo = None
+        self._cambiar_estado_generando(False, mensaje)
+        QMessageBox.information(self, "Generación cancelada", mensaje)
 
     def _on_generacion_error(self, mensaje: str, detalle: str) -> None:
+        self._trabajador_activo = None
         self._cambiar_estado_generando(False, "")
         LOGGER.error("Falló la generación desde wizard: %s | detalle=%s", mensaje, detalle)
-        QMessageBox.critical(
-            self,
-            "Error de generación",
-            f"{mensaje}\n\nDetalle:\n{detalle}",
+        self._mostrar_error_generacion()
+
+    def _mostrar_dialogo_exito(self, salida: GenerarProyectoMvpSalida) -> None:
+        mensaje = QMessageBox(self)
+        mensaje.setIcon(QMessageBox.Information)
+        mensaje.setWindowTitle("Generación completada")
+        mensaje.setText("Proyecto generado correctamente.")
+        mensaje.setInformativeText(
+            "\n".join(
+                [
+                    f"Ruta generada: {salida.ruta_generada}",
+                    f"Número de archivos: {salida.archivos_generados}",
+                    "Resultado auditoría:",
+                    f"Errores: {len(salida.errores)}",
+                    f"Warnings: {len(salida.warnings)}",
+                ]
+            )
         )
+        abrir_btn = mensaje.addButton("Abrir carpeta del proyecto", QMessageBox.ActionRole)
+        mensaje.addButton(QMessageBox.Ok)
+        mensaje.exec()
+        if mensaje.clickedButton() is abrir_btn:
+            self._abrir_carpeta(salida.ruta_generada)
+
+    def _mostrar_error_generacion(self) -> None:
+        mensaje = QMessageBox(self)
+        mensaje.setIcon(QMessageBox.Critical)
+        mensaje.setWindowTitle("Error de generación")
+        mensaje.setText("La generación falló.")
+        mensaje.setInformativeText("Revisa logs en carpeta logs/")
+        abrir_logs_btn = mensaje.addButton("Abrir carpeta logs", QMessageBox.ActionRole)
+        mensaje.addButton(QMessageBox.Ok)
+        mensaje.exec()
+        if mensaje.clickedButton() is abrir_logs_btn:
+            self._abrir_carpeta("logs")
+
+    def _manejar_excepcion_visual(self, exc: Exception, mensaje_usuario: str) -> None:
+        detalle = traceback.format_exc()
+        LOGGER.error("Excepción no controlada en wizard: %s", exc)
+        LOGGER.debug("Stacktrace wizard:\n%s", detalle)
+        logs_dir = Path("logs")
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        with (logs_dir / "crashes.log").open("a", encoding="utf-8") as file:
+            file.write(f"\n{detalle}\n")
+        QMessageBox.critical(self, "Error", mensaje_usuario)
+
+    def _abrir_carpeta(self, ruta: str) -> None:
+        url = QUrl.fromLocalFile(str(Path(ruta).resolve()))
+        if not QDesktopServices.openUrl(url):
+            QMessageBox.warning(self, "Abrir carpeta", f"No se pudo abrir: {ruta}")

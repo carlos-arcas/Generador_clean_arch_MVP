@@ -1,4 +1,4 @@
-# Generador Base Proyectos (v1.1.0)
+# Generador Base Proyectos (v1.6.0)
 
 Herramienta para generar proyectos base con Clean Architecture a partir de blueprints combinables.
 
@@ -29,6 +29,12 @@ Los presets se guardan en `configuracion/presets/*.json` e incluyen:
 ## Auditoría
 El auditor valida estructura, imports, logging, cobertura y consistencia de `manifest.json` + hashes.
 Siempre genera `docs/informe_auditoria.md` con estado **APROBADO** o **RECHAZADO**.
+
+## Experiencia de generación
+- **Progreso por etapas**: el wizard informa cada fase real (validación, plan, ejecución, manifest, auditoría y finalización) con barra en modo ocupado sin bloquear la UI.
+- **Cancelación segura**: durante la ejecución aparece el botón **Cancelar generación**; la cancelación es cooperativa y ejecuta rollback de carpeta parcial si aplica.
+- **Auditoría automática**: al final se muestran errores y warnings detectados por la auditoría post-generación.
+- **Logs y crashes**: ante fallos revisa `logs/` y, para excepciones no controladas, el detalle técnico queda en `logs/crashes.log`.
 
 ## Ejecución rápida
 ### UI
