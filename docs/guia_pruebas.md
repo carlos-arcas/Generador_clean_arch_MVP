@@ -32,3 +32,15 @@ Se añadieron suites para el sistema de blueprints, manifest y auditoría:
 
 ## Objetivo de cobertura
 La cobertura mínima obligatoria es **85%** y se valida en la ejecución con `pytest-cov`.
+
+
+## Pruebas de presentación (v0.5.0)
+Se agregan pruebas de wiring mínimas para validar integración PySide6 sin testear comportamiento visual:
+
+- `tests/presentacion/test_wiring_basico.py`
+  - instancia `VentanaPrincipal` con `QApplication` en modo `offscreen`;
+  - verifica que `TrabajadorGeneracion` invoca los casos de uso esperados mediante mocks.
+- `tests/presentacion/test_main.py`
+  - valida que el entrypoint `python -m presentacion` construye aplicación y ventana sin levantar UI real (dobles de prueba).
+
+Estas pruebas comprueban orquestación y contratos de integración, dejando la lógica de negocio en dominio/aplicación.

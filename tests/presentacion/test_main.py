@@ -1,16 +1,38 @@
-from pathlib import Path
-import shutil
+"""Pruebas del punto de entrada de presentación."""
 
-from presentacion.__main__ import main
+from __future__ import annotations
+
+import os
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from presentacion import __main__ as modulo_main
 
 
-def test_main_ejecuta_flujo_minimo_generando_archivos() -> None:
-    destino = Path("salida") / "proyecto_demo"
-    if destino.exists():
-        shutil.rmtree(destino)
+class _FakeApp:
+    def __init__(self, argv: list[str]) -> None:
+        self.argv = argv
 
-    main()
+    def exec(self) -> int:
+        return 0
 
-    assert (destino / "README.md").exists()
-    assert (destino / "VERSION").exists()
-    assert (destino / "CHANGELOG.md").exists()
+
+class _FakeVentana:
+    def __init__(self, version_generador: str) -> None:
+        self.version_generador = version_generador
+        self.mostrada = False
+
+    def show(self) -> None:
+        self.mostrada = True
+
+
+def test_main_inicializa_app_qt(monkeypatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "VERSION").write_text("0.5.0", encoding="utf-8")
+
+    monkeypatch.setattr(modulo_main, "QApplication", _FakeApp)
+    monkeypatch.setattr(modulo_main, "VentanaPrincipal", _FakeVentana)
+
+    codigo = modulo_main.main()
+
+    assert codigo == 0

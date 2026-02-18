@@ -1,1 +1,1 @@
-"""Capa de presentación para ejecutar el flujo mínimo de generación."""
+"""Capa de presentación con UI PySide6 y wiring de casos de uso."""
