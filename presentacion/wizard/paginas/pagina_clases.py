@@ -12,14 +12,21 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWizard,
     QWizardPage,
 )
 
-from presentacion.wizard.modelos.modelo_clases_temporal import AtributoTemporal, ClaseTemporal
+from dominio.modelos import (
+    ErrorValidacionDominio,
+    EspecificacionAtributo,
+    EspecificacionClase,
+    EspecificacionProyecto,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,8 +40,6 @@ class PaginaClases(QWizardPage):
         super().__init__()
         self.setTitle("Clases")
         self.setSubTitle("Añade clases y sus atributos iniciales.")
-
-        self._clases_temporales: list[ClaseTemporal] = []
 
         self._campo_nombre_clase = QLineEdit()
         self._campo_nombre_clase.setPlaceholderText("Nombre de clase")
@@ -103,6 +108,9 @@ class PaginaClases(QWizardPage):
         ]
         self._actualizar_estado_panel_atributos(False)
 
+    def isComplete(self) -> bool:  # noqa: N802
+        return bool(self._obtener_especificacion_proyecto().clases)
+
     def anadir_clase_desde_input(self) -> bool:
         return self.anadir_clase(self._campo_nombre_clase.text())
 
@@ -110,24 +118,33 @@ class PaginaClases(QWizardPage):
         nombre_limpio = self._normalizar_nombre(nombre_clase)
         if nombre_limpio is None:
             return False
-        if self._buscar_clase(nombre_limpio) is not None:
+
+        try:
+            self._obtener_especificacion_proyecto().agregar_clase(
+                EspecificacionClase(nombre=nombre_limpio)
+            )
+        except ErrorValidacionDominio as error:
+            LOGGER.warning("No se pudo añadir la clase '%s': %s", nombre_limpio, error)
+            QMessageBox.critical(self, "Error de validación", str(error))
             return False
 
-        self._clases_temporales.append(ClaseTemporal(nombre=nombre_limpio))
         self._lista_clases.addItem(QListWidgetItem(nombre_limpio))
         self._campo_nombre_clase.clear()
         self._lista_clases.setCurrentRow(self._lista_clases.count() - 1)
         LOGGER.debug("Clase añadida: %s", nombre_limpio)
+        self.completeChanged.emit()
         return True
 
     def eliminar_clase_seleccionada(self) -> bool:
-        indice = self._indice_clase_seleccionada()
-        if indice is None:
+        clase = self._clase_seleccionada()
+        if clase is None:
             return False
 
-        clase_eliminada = self._clases_temporales.pop(indice)
+        self._obtener_especificacion_proyecto().eliminar_clase(clase.id_interno)
+        indice = self._lista_clases.currentRow()
         self._lista_clases.takeItem(indice)
-        LOGGER.debug("Clase eliminada: %s", clase_eliminada.nombre)
+        LOGGER.debug("Clase eliminada: %s", clase.nombre)
+        self.completeChanged.emit()
         return True
 
     def anadir_atributo_desde_input(self) -> bool:
@@ -138,62 +155,55 @@ class PaginaClases(QWizardPage):
         )
 
     def anadir_atributo(self, *, nombre_atributo: str, tipo: str, obligatorio: bool) -> bool:
-        indice = self._indice_clase_seleccionada()
-        if indice is None:
+        clase = self._clase_seleccionada()
+        if clase is None:
             return False
 
         nombre_limpio = self._normalizar_nombre(nombre_atributo)
         if nombre_limpio is None:
             return False
 
-        clase = self._clases_temporales[indice]
-        if any(atributo.nombre == nombre_limpio for atributo in clase.atributos):
+        try:
+            clase.agregar_atributo(
+                EspecificacionAtributo(
+                    nombre=nombre_limpio,
+                    tipo=tipo,
+                    obligatorio=obligatorio,
+                )
+            )
+        except ErrorValidacionDominio as error:
+            LOGGER.warning(
+                "No se pudo añadir el atributo '%s' en '%s': %s",
+                nombre_limpio,
+                clase.nombre,
+                error,
+            )
+            QMessageBox.critical(self, "Error de validación", str(error))
             return False
 
-        atributo = AtributoTemporal(nombre=nombre_limpio, tipo=tipo, obligatorio=obligatorio)
-        clase.atributos.append(atributo)
         self._campo_nombre_atributo.clear()
         self._checkbox_obligatorio.setChecked(False)
         self._renderizar_atributos(clase)
-        LOGGER.debug("Atributo añadido: %s.%s", clase.nombre, atributo.nombre)
+        LOGGER.debug("Atributo añadido: %s.%s", clase.nombre, nombre_limpio)
         return True
 
     def eliminar_atributo_seleccionado(self) -> bool:
-        indice_clase = self._indice_clase_seleccionada()
-        if indice_clase is None:
+        clase = self._clase_seleccionada()
+        if clase is None:
             return False
 
         fila_atributo = self._tabla_atributos.currentRow()
-        if fila_atributo < 0:
+        if fila_atributo < 0 or fila_atributo >= len(clase.atributos):
             return False
 
-        clase = self._clases_temporales[indice_clase]
-        if fila_atributo >= len(clase.atributos):
-            return False
-
-        atributo_eliminado = clase.atributos.pop(fila_atributo)
+        atributo_eliminado = clase.atributos[fila_atributo]
+        clase.eliminar_atributo(atributo_eliminado.id_interno)
         self._renderizar_atributos(clase)
         LOGGER.debug("Atributo eliminado: %s.%s", clase.nombre, atributo_eliminado.nombre)
         return True
 
     def clases(self) -> list[str]:
-        return [clase.nombre for clase in self._clases_temporales]
-
-    def clases_temporales(self) -> list[ClaseTemporal]:
-        return [
-            ClaseTemporal(
-                nombre=clase.nombre,
-                atributos=[
-                    AtributoTemporal(
-                        nombre=atributo.nombre,
-                        tipo=atributo.tipo,
-                        obligatorio=atributo.obligatorio,
-                    )
-                    for atributo in clase.atributos
-                ],
-            )
-            for clase in self._clases_temporales
-        ]
+        return [clase.nombre for clase in self._obtener_especificacion_proyecto().clases]
 
     def panel_atributos_habilitado(self) -> bool:
         return self._tabla_atributos.isEnabled()
@@ -207,41 +217,34 @@ class PaginaClases(QWizardPage):
     def limpiar_seleccion_clase(self) -> None:
         self._lista_clases.setCurrentRow(-1)
 
-    def _indice_clase_seleccionada(self) -> int | None:
+    def _clase_seleccionada(self) -> EspecificacionClase | None:
         indice = self._lista_clases.currentRow()
-        if indice < 0 or indice >= len(self._clases_temporales):
+        clases = self._obtener_especificacion_proyecto().clases
+        if indice < 0 or indice >= len(clases):
             return None
-        return indice
-
-    def _buscar_clase(self, nombre_clase: str) -> ClaseTemporal | None:
-        for clase in self._clases_temporales:
-            if clase.nombre == nombre_clase:
-                return clase
-        return None
+        return clases[indice]
 
     def _normalizar_nombre(self, nombre: str) -> str | None:
         nombre_limpio = nombre.strip()
         if not nombre_limpio:
             return None
-        if " " in nombre_limpio:
-            return None
         return nombre_limpio
 
     def _al_cambiar_clase_seleccionada(self, _: int) -> None:
-        indice = self._indice_clase_seleccionada()
-        if indice is None:
+        clase = self._clase_seleccionada()
+        if clase is None:
             self._actualizar_estado_panel_atributos(False)
             self._renderizar_atributos(None)
             return
 
         self._actualizar_estado_panel_atributos(True)
-        self._renderizar_atributos(self._clases_temporales[indice])
+        self._renderizar_atributos(clase)
 
     def _actualizar_estado_panel_atributos(self, habilitado: bool) -> None:
         for widget in self._widgets_panel_atributos:
             widget.setEnabled(habilitado)
 
-    def _renderizar_atributos(self, clase: ClaseTemporal | None) -> None:
+    def _renderizar_atributos(self, clase: EspecificacionClase | None) -> None:
         self._tabla_atributos.setRowCount(0)
         if clase is None:
             return
@@ -253,3 +256,12 @@ class PaginaClases(QWizardPage):
             item_obligatorio = QTableWidgetItem("Sí" if atributo.obligatorio else "No")
             item_obligatorio.setTextAlignment(Qt.AlignCenter)
             self._tabla_atributos.setItem(fila, 2, item_obligatorio)
+
+    def _obtener_especificacion_proyecto(self) -> EspecificacionProyecto:
+        wizard = self.wizard()
+        if wizard is None or not isinstance(wizard, QWizard):
+            raise RuntimeError("La página de clases requiere estar asociada a un QWizard.")
+        especificacion = getattr(wizard, "especificacion_proyecto", None)
+        if not isinstance(especificacion, EspecificacionProyecto):
+            raise RuntimeError("El wizard no contiene una especificación de proyecto válida.")
+        return especificacion

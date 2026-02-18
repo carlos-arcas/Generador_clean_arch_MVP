@@ -1,1 +1,1 @@
-"""Modelos temporales de la capa de presentación para el wizard."""
+"""Paquete reservado para futuros modelos auxiliares de wizard."""

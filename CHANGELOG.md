@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.0] - 2026-02-18
+
+### Modificado
+- Wizard ahora usa modelo de dominio real.
+
 ## [1.0.2] - 2026-02-18
 
 ### Añadido

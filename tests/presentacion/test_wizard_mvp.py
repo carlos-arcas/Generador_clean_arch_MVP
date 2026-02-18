@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 QtWidgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 QApplication = QtWidgets.QApplication
 
-from presentacion.wizard.modelos.modelo_clases_temporal import AtributoTemporal, ClaseTemporal
+from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from presentacion.wizard.paginas.pagina_resumen import PaginaResumen
 from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
 
@@ -61,12 +61,19 @@ def test_persistencia_por_defecto_json(app_qt: QApplication) -> None:
 def test_pagina_resumen_contiene_nombre_y_persistencia(app_qt: QApplication) -> None:
     pagina = PaginaResumen()
 
+    especificacion = EspecificacionProyecto(nombre_proyecto="Inventario", ruta_destino="/tmp/inventario")
+    clase_producto = EspecificacionClase(nombre="Producto")
+    clase_producto.agregar_atributo(
+        EspecificacionAtributo(nombre="id", tipo="int", obligatorio=True)
+    )
+    especificacion.agregar_clase(clase_producto)
+
     resumen = pagina.construir_resumen(
         nombre="Inventario",
         ruta="/tmp/inventario",
         descripcion="Sistema de inventario",
         version="1.0.1",
-        clases=[ClaseTemporal(nombre="Producto", atributos=[AtributoTemporal(nombre="id", tipo="int", obligatorio=True)])],
+        especificacion_proyecto=especificacion,
         persistencia="SQLite",
     )
 

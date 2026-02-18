@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from presentacion.wizard.modelos.modelo_clases_temporal import ClaseTemporal
+from dominio.modelos import EspecificacionProyecto
 
 
 @dataclass(frozen=True)
@@ -15,5 +15,5 @@ class DatosWizardProyecto:
     ruta: str
     descripcion: str
     version: str
-    clases: list[ClaseTemporal]
+    especificacion_proyecto: EspecificacionProyecto
     persistencia: str

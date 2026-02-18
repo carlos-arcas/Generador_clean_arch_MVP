@@ -10,8 +10,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 QtWidgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 QApplication = QtWidgets.QApplication
+QMessageBox = QtWidgets.QMessageBox
 
-from presentacion.wizard.paginas.pagina_clases import PaginaClases
+from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
 
 
 @pytest.fixture
@@ -22,60 +23,66 @@ def app_qt() -> QApplication:
     return app
 
 
-def test_anadir_clase_valida(app_qt: QApplication) -> None:
-    pagina = PaginaClases()
+@pytest.fixture
+def wizard(app_qt: QApplication, monkeypatch: pytest.MonkeyPatch) -> WizardGeneradorProyectos:
+    monkeypatch.setattr(QMessageBox, "critical", lambda *args, **kwargs: QMessageBox.Ok)
+    return WizardGeneradorProyectos()
+
+
+def test_anadir_clase_valida(wizard: WizardGeneradorProyectos) -> None:
+    pagina = wizard.pagina_clases
 
     assert pagina.anadir_clase("Cliente") is True
     assert pagina.clases() == ["Cliente"]
 
 
-def test_no_permitir_clase_duplicada(app_qt: QApplication) -> None:
-    pagina = PaginaClases()
+def test_no_permitir_clase_duplicada(wizard: WizardGeneradorProyectos) -> None:
+    pagina = wizard.pagina_clases
 
     assert pagina.anadir_clase("Cliente") is True
     assert pagina.anadir_clase("Cliente") is False
     assert pagina.clases() == ["Cliente"]
 
 
-def test_anadir_atributo_valido(app_qt: QApplication) -> None:
-    pagina = PaginaClases()
+def test_anadir_atributo_valido(wizard: WizardGeneradorProyectos) -> None:
+    pagina = wizard.pagina_clases
     pagina.anadir_clase("Cliente")
 
     assert pagina.anadir_atributo(nombre_atributo="nombre", tipo="str", obligatorio=True) is True
-    clases = pagina.clases_temporales()
+    clases = wizard.especificacion_proyecto.clases
     assert len(clases[0].atributos) == 1
     assert clases[0].atributos[0].nombre == "nombre"
 
 
-def test_no_permitir_atributo_duplicado(app_qt: QApplication) -> None:
-    pagina = PaginaClases()
+def test_no_permitir_atributo_duplicado(wizard: WizardGeneradorProyectos) -> None:
+    pagina = wizard.pagina_clases
     pagina.anadir_clase("Cliente")
 
     assert pagina.anadir_atributo(nombre_atributo="nombre", tipo="str", obligatorio=False) is True
     assert pagina.anadir_atributo(nombre_atributo="nombre", tipo="str", obligatorio=True) is False
 
 
-def test_eliminar_atributo(app_qt: QApplication) -> None:
-    pagina = PaginaClases()
+def test_eliminar_atributo(wizard: WizardGeneradorProyectos) -> None:
+    pagina = wizard.pagina_clases
     pagina.anadir_clase("Cliente")
     pagina.anadir_atributo(nombre_atributo="nombre", tipo="str", obligatorio=False)
     assert pagina.seleccionar_atributo(0) is True
 
     assert pagina.eliminar_atributo_seleccionado() is True
-    assert pagina.clases_temporales()[0].atributos == []
+    assert wizard.especificacion_proyecto.clases[0].atributos == []
 
 
-def test_eliminar_clase_elimina_sus_atributos(app_qt: QApplication) -> None:
-    pagina = PaginaClases()
+def test_eliminar_clase_elimina_sus_atributos(wizard: WizardGeneradorProyectos) -> None:
+    pagina = wizard.pagina_clases
     pagina.anadir_clase("Cliente")
     pagina.anadir_atributo(nombre_atributo="nombre", tipo="str", obligatorio=False)
 
     assert pagina.eliminar_clase_seleccionada() is True
-    assert pagina.clases_temporales() == []
+    assert wizard.especificacion_proyecto.clases == []
 
 
-def test_panel_atributos_deshabilitado_sin_clase_seleccionada(app_qt: QApplication) -> None:
-    pagina = PaginaClases()
+def test_panel_atributos_deshabilitado_sin_clase_seleccionada(wizard: WizardGeneradorProyectos) -> None:
+    pagina = wizard.pagina_clases
 
     assert pagina.panel_atributos_habilitado() is False
 
