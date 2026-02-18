@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Protocol
 
 from dominio.modelos import EspecificacionProyecto, PlanGeneracion
 
@@ -37,3 +38,10 @@ class RepositorioBlueprints(ABC):
     @abstractmethod
     def obtener_por_nombre(self, nombre: str) -> Blueprint:
         """Obtiene un blueprint por su nombre único."""
+
+
+class DescubridorPlugins(Protocol):
+    """Contrato para localizar blueprints externos instalados como plugins."""
+
+    def cargar_plugin(self, nombre: str) -> Blueprint:
+        """Carga un blueprint de plugin por su nombre."""

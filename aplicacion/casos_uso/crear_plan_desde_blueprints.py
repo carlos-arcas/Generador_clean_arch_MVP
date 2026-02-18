@@ -5,9 +5,8 @@ from __future__ import annotations
 import logging
 
 from aplicacion.errores import ErrorBlueprintNoEncontrado, ErrorConflictoArchivos, ErrorValidacion
-from aplicacion.puertos.blueprint import RepositorioBlueprints
+from aplicacion.puertos.blueprint import DescubridorPlugins, RepositorioBlueprints
 from dominio.modelos import ErrorValidacionDominio, EspecificacionProyecto, PlanGeneracion
-from infraestructura.plugins.descubridor_plugins import DescubridorPlugins
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class CrearPlanDesdeBlueprints:
         descubridor_plugins: DescubridorPlugins | None = None,
     ) -> None:
         self._repositorio = repositorio_blueprints
-        self._descubridor_plugins = descubridor_plugins or DescubridorPlugins()
+        self._descubridor_plugins = descubridor_plugins
 
     def ejecutar(
         self, especificacion: EspecificacionProyecto, nombres_blueprints: list[str]
@@ -56,6 +55,9 @@ class CrearPlanDesdeBlueprints:
                 "Blueprint interno '%s' no encontrado, intentando plugins externos.",
                 nombre_blueprint,
             )
+
+        if self._descubridor_plugins is None:
+            raise ErrorBlueprintNoEncontrado(f"Blueprint no encontrado: {nombre_blueprint}")
 
         try:
             plugin = self._descubridor_plugins.cargar_plugin(nombre_blueprint)

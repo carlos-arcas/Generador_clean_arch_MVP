@@ -83,9 +83,9 @@ class WizardGeneradorProyectos(QWizard):
             or guardar_credencial is None
             or catalogo_blueprints is None
         ):
-            from bootstrap.composition_root import crear_contenedor
+            from infraestructura.bootstrap import construir_contenedor_aplicacion
 
-            contenedor = crear_contenedor()
+            contenedor = construir_contenedor_aplicacion()
             generar_proyecto = generar_proyecto or contenedor.generar_proyecto_mvp
             guardar_preset = guardar_preset or contenedor.guardar_preset_proyecto
             cargar_preset = cargar_preset or contenedor.cargar_preset_proyecto

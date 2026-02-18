@@ -7,9 +7,11 @@ import logging
 from pathlib import Path
 
 from aplicacion.errores import ErrorAplicacion, ErrorAuditoria
-from bootstrap.composition_root import configurar_logging, crear_contenedor
+from infraestructura.bootstrap import configurar_logging, construir_contenedor_aplicacion
 
 LOGGER = logging.getLogger(__name__)
+
+crear_contenedor = construir_contenedor_aplicacion
 
 
 def construir_parser() -> argparse.ArgumentParser:

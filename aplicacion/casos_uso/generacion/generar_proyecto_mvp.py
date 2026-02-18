@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import logging
 from pathlib import Path
 import shutil
+from typing import Protocol
 
 from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import (
     AuditarProyectoGenerado,
@@ -16,9 +18,55 @@ from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.puertos.sistema_archivos import SistemaArchivos
 from dominio.excepciones.proyecto_ya_existe_error import ProyectoYaExisteError
 from dominio.modelos import EspecificacionProyecto
-from infraestructura.manifest.generador_manifest import GeneradorManifest
 
 LOGGER = logging.getLogger(__name__)
+
+
+class GeneradorManifest(Protocol):
+    """Contrato mínimo para generar manifest del proyecto."""
+
+    def generar(
+        self,
+        ruta_proyecto: str,
+        especificacion_proyecto: EspecificacionProyecto,
+        blueprints: list[str],
+        archivos_generados: list[str],
+    ) -> None:
+        """Genera el manifest para un proyecto."""
+
+
+class _GeneradorManifestInterno:
+    """Generador local de `configuracion/MANIFEST.json` para ejecución por defecto."""
+
+    def generar(
+        self,
+        ruta_proyecto: str,
+        especificacion_proyecto: EspecificacionProyecto,
+        blueprints: list[str],
+        archivos_generados: list[str],
+    ) -> None:
+        ruta_manifest = Path(ruta_proyecto) / "configuracion" / "MANIFEST.json"
+        ruta_manifest.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "version_generador": self._leer_version_generador(),
+            "blueprints": blueprints,
+            "clases": [
+                {
+                    "nombre": clase.nombre,
+                    "atributos": [atributo.nombre for atributo in clase.atributos],
+                }
+                for clase in especificacion_proyecto.clases
+            ],
+            "archivos_generados": len(archivos_generados),
+        }
+        ruta_manifest.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _leer_version_generador(self) -> str:
+        ruta_version = Path("VERSION")
+        if not ruta_version.exists():
+            return "0.0.0"
+        return ruta_version.read_text(encoding="utf-8").strip()
+
 
 DIRECTORIOS_BASE_MVP = [
     "dominio",
@@ -69,7 +117,7 @@ class GenerarProyectoMvp:
         self._crear_plan = crear_plan_desde_blueprints
         self._ejecutar_plan = ejecutar_plan
         self._sistema_archivos = sistema_archivos
-        self._generador_manifest = generador_manifest or GeneradorManifest()
+        self._generador_manifest = generador_manifest or _GeneradorManifestInterno()
         self._auditor = auditor or AuditarProyectoGenerado()
 
     def ejecutar(self, entrada: GenerarProyectoMvpEntrada) -> GenerarProyectoMvpSalida:
@@ -116,12 +164,13 @@ class GenerarProyectoMvp:
                 blueprints_usados=[f"{nombre}@1.0.0" for nombre in blueprints_normalizados],
                 generar_manifest=True,
             )
-            self._generador_manifest.generar(
-                ruta_proyecto=str(ruta_proyecto),
-                especificacion_proyecto=especificacion,
-                blueprints=entrada.blueprints,
-                archivos_generados=archivos_creados,
-            )
+            if self._generador_manifest is not None:
+                self._generador_manifest.generar(
+                    ruta_proyecto=str(ruta_proyecto),
+                    especificacion_proyecto=especificacion,
+                    blueprints=entrada.blueprints,
+                    archivos_generados=archivos_creados,
+                )
 
             resultado_auditoria = self._auditor.auditar(str(ruta_proyecto))
             LOGGER.info(
