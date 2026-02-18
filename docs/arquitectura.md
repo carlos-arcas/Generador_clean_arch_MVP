@@ -49,3 +49,11 @@ Relación permitida:
 - `manifest.json` se genera siempre al ejecutar el plan con hash SHA256 por archivo.
 - Se registran blueprints usados, opciones de ejecución, timestamp ISO y versión del generador.
 - La auditoría mínima valida presencia de `manifest.json`, `README.md`, `VERSION`, `logs` y scripts básicos.
+
+
+## Módulo constructor dinámico de clases (v0.3.0)
+- **Dominio**: incorpora `EspecificacionClase` y `EspecificacionAtributo` con reglas explícitas (PascalCase, no duplicados, validaciones de nombre/tipo).
+- **Aplicación**: agrega casos de uso orientados a edición incremental de modelo (`AgregarClase`, `RenombrarClase`, `AgregarAtributo`, etc.).
+- **Puertos**: define `RepositorioEspecificacionProyecto` para desacoplar almacenamiento del estado.
+- **Infraestructura**: implementa `RepositorioEspecificacionProyectoEnMemoria` para pruebas rápidas y sin persistencia.
+- **Presentación**: no se incorpora UI en esta etapa; el módulo queda preparado para futura integración con PySide6 sin acoplar la lógica.

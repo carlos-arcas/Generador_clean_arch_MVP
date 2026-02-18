@@ -2,6 +2,18 @@
 
 Todos los cambios importantes de este proyecto se documentan en este archivo.
 
+## [0.3.0] - 2026-02-18
+### Agregado
+- Modelo de dominio para constructor dinámico: `EspecificacionClase` y `EspecificacionAtributo` con reglas de validación.
+- Ampliación de `EspecificacionProyecto` con gestión de clases en memoria.
+- Puerto `RepositorioEspecificacionProyecto` y adaptador `RepositorioEspecificacionProyectoEnMemoria`.
+- Casos de uso para agregar/eliminar/renombrar clases y agregar/editar/eliminar atributos, además de listar y obtener detalle.
+- Logging en casos de uso del constructor dinámico (DEBUG/INFO/WARNING).
+- Suite de pruebas de dominio y aplicación para los escenarios correctos, errores y bordes del constructor dinámico.
+
+### Cambiado
+- Versión del generador actualizada a `0.3.0`.
+
 ## [0.2.0] - 2026-02-18
 ### Agregado
 - Sistema de blueprints versionados con contrato en aplicación y repositorio en disco.
