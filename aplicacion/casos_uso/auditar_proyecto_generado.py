@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import json
 import logging
 from pathlib import Path
 import re
 
+from aplicacion.errores import ErrorAuditoria
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos
+from infraestructura.calculadora_hash_real import CalculadoraHashReal
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,6 +24,13 @@ class ResultadoAuditoria:
     lista_errores: list[str] = field(default_factory=list)
     cobertura: float | None = None
     resumen: str = ""
+
+
+@dataclass(frozen=True)
+class ResultadoComando:
+    codigo_salida: int
+    stdout: str
+    stderr: str
 
 
 class AuditarProyectoGenerado:
@@ -41,54 +51,67 @@ class AuditarProyectoGenerado:
 
     def __init__(self, ejecutor_procesos: EjecutorProcesos) -> None:
         self._ejecutor_procesos = ejecutor_procesos
+        self._calculadora_hash = CalculadoraHashReal()
 
     def ejecutar(self, ruta_proyecto: str, blueprints_usados: list[str] | None = None) -> ResultadoAuditoria:
         """Ejecuta las validaciones obligatorias sobre un proyecto ya generado."""
         base = Path(ruta_proyecto)
         errores: list[str] = []
         blueprints = blueprints_usados or []
+        resultado_pytest = ResultadoComando(codigo_salida=1, stdout="No ejecutado", stderr="")
+        cobertura: float | None = None
+        conclusion = "RECHAZADO"
         LOGGER.info("Inicio auditoría avanzada proyecto=%s", ruta_proyecto)
 
-        errores.extend(self._validar_estructura(base))
-        errores.extend(self._validar_imports(base))
-        errores.extend(self._validar_logging(base))
-        errores.extend(self._validar_dependencias_informes(base, blueprints))
+        try:
+            errores.extend(self._validar_estructura(base))
+            errores.extend(self._validar_imports(base))
+            errores.extend(self._validar_logging(base))
+            errores.extend(self._validar_dependencias_informes(base, blueprints))
+            errores.extend(self._validar_consistencia_manifest(base))
 
-        resultado_pytest = self._ejecutor_procesos.ejecutar(
-            comando=["pytest", "--cov=.", "--cov-report=term"],
-            cwd=str(base),
-        )
-        cobertura = self._extraer_cobertura_total(resultado_pytest.stdout)
-        if cobertura is None:
-            errores.append("No fue posible extraer el porcentaje total de cobertura de pytest.")
-        elif cobertura < 85.0:
-            errores.append(f"Cobertura insuficiente: {cobertura:.2f}% (mínimo requerido: 85%).")
+            resultado_pytest = self._ejecutor_procesos.ejecutar(
+                comando=["pytest", "--cov=.", "--cov-report=term"],
+                cwd=str(base),
+            )
+            cobertura = self._extraer_cobertura_total(resultado_pytest.stdout)
+            if cobertura is None:
+                errores.append("No fue posible extraer el porcentaje total de cobertura de pytest.")
+            elif cobertura < 85.0:
+                errores.append(f"Cobertura insuficiente: {cobertura:.2f}% (mínimo requerido: 85%).")
 
-        if resultado_pytest.codigo_salida != 0 and cobertura is None:
-            errores.append("La ejecución de pytest finalizó con error y sin reporte de cobertura usable.")
+            if resultado_pytest.codigo_salida != 0 and cobertura is None:
+                errores.append("La ejecución de pytest finalizó con error y sin reporte de cobertura usable.")
 
-        LOGGER.info("Cobertura total detectada: %s", cobertura)
-        LOGGER.info("Errores de auditoría detectados: %s", errores)
+            LOGGER.info("Cobertura total detectada: %s", cobertura)
+            LOGGER.info("Errores de auditoría detectados: %s", errores)
 
-        valido = not errores
-        conclusion = "APROBADO" if valido else "RECHAZADO"
-        resumen = (
-            f"Auditoría {conclusion}. "
-            f"Errores: {len(errores)}. "
-            f"Cobertura: {f'{cobertura:.2f}%' if cobertura is not None else 'no disponible'}."
-        )
-
-        self._escribir_informe(
-            base=base,
-            blueprints=blueprints,
-            errores=errores,
-            cobertura=cobertura,
-            resultado_pytest=resultado_pytest,
-            conclusion=conclusion,
-        )
-
-        LOGGER.info("Conclusión final de auditoría: %s", conclusion)
-        return ResultadoAuditoria(valido=valido, lista_errores=errores, cobertura=cobertura, resumen=resumen)
+            valido = not errores
+            conclusion = "APROBADO" if valido else "RECHAZADO"
+            resumen = (
+                f"Auditoría {conclusion}. "
+                f"Errores: {len(errores)}. "
+                f"Cobertura: {f'{cobertura:.2f}%' if cobertura is not None else 'no disponible'}."
+            )
+            return ResultadoAuditoria(
+                valido=valido,
+                lista_errores=errores,
+                cobertura=cobertura,
+                resumen=resumen,
+            )
+        except Exception as exc:
+            LOGGER.error("Fallo inesperado en auditoría: %s", exc, exc_info=True)
+            errores.append(f"Error de auditoría: {exc}")
+            raise ErrorAuditoria(f"No fue posible completar la auditoría: {exc}") from exc
+        finally:
+            self._escribir_informe(
+                base=base,
+                blueprints=blueprints,
+                errores=errores,
+                cobertura=cobertura,
+                resultado_pytest=resultado_pytest,
+                conclusion=conclusion,
+            )
 
     def _validar_estructura(self, base: Path) -> list[str]:
         LOGGER.info("Evaluando reglas de estructura")
@@ -114,17 +137,15 @@ class AuditarProyectoGenerado:
             contenido = ruta_archivo.read_text(encoding="utf-8")
             imports = set(patron_import.findall(contenido)) | set(patron_from.findall(contenido))
             grafo_imports[modulo_actual] = imports
+            if not relativo.parts:
+                continue
 
             for modulo in imports:
                 modulo_raiz = modulo.lower().split(".")[0]
                 if modulo_raiz == "sqlite3" and relativo.parts[0] != "infraestructura":
-                    errores.append(
-                        f"Import sqlite3 fuera de infraestructura ({relativo}): {modulo}"
-                    )
+                    errores.append(f"Import sqlite3 fuera de infraestructura ({relativo}): {modulo}")
                 if modulo_raiz in modulos_exportacion and relativo.parts[0] != "infraestructura":
-                    errores.append(
-                        f"Import {modulo_raiz} fuera de infraestructura ({relativo}): {modulo}"
-                    )
+                    errores.append(f"Import {modulo_raiz} fuera de infraestructura ({relativo}): {modulo}")
 
             if relativo.parts[0] == "dominio":
                 for modulo in imports:
@@ -146,9 +167,7 @@ class AuditarProyectoGenerado:
             elif relativo.parts[0] == "presentacion":
                 for modulo in imports:
                     if modulo.lower().startswith("infraestructura"):
-                        errores.append(
-                            f"Import prohibido en presentación ({relativo}): {modulo}"
-                        )
+                        errores.append(f"Import prohibido en presentación ({relativo}): {modulo}")
 
         errores.extend(self._detectar_ciclos_basicos(grafo_imports))
         return errores
@@ -168,6 +187,27 @@ class AuditarProyectoGenerado:
             errores.append("requirements.txt no incluye openpyxl para exportación Excel.")
         if "reportlab" not in contenido:
             errores.append("requirements.txt no incluye reportlab para exportación PDF.")
+        return errores
+
+    def _validar_consistencia_manifest(self, base: Path) -> list[str]:
+        ruta_manifest = base / "manifest.json"
+        if not ruta_manifest.exists():
+            return []
+        payload = json.loads(ruta_manifest.read_text(encoding="utf-8"))
+        errores: list[str] = []
+        for entrada in payload.get("archivos", []):
+            ruta_relativa = entrada.get("ruta_relativa", "")
+            hash_esperado = entrada.get("hash_sha256", "")
+            if not ruta_relativa or not hash_esperado:
+                errores.append("manifest.json contiene entradas incompletas.")
+                continue
+            ruta_archivo = base / ruta_relativa
+            if not ruta_archivo.exists():
+                errores.append(f"manifest.json referencia archivo inexistente: {ruta_relativa}")
+                continue
+            hash_actual = self._calculadora_hash.calcular_sha256(str(ruta_archivo))
+            if hash_actual != hash_esperado:
+                errores.append(f"Hash inconsistente para {ruta_relativa} en manifest.json")
         return errores
 
     def _detectar_ciclos_basicos(self, grafo_imports: dict[str, set[str]]) -> list[str]:
@@ -201,7 +241,7 @@ class AuditarProyectoGenerado:
         blueprints: list[str],
         errores: list[str],
         cobertura: float | None,
-        resultado_pytest,
+        resultado_pytest: ResultadoComando,
         conclusion: str,
     ) -> None:
         ruta_docs = base / "docs"
@@ -211,6 +251,7 @@ class AuditarProyectoGenerado:
         estructura_ok = "OK" if not any("recurso obligatorio" in e for e in errores) else "ERROR"
         arquitectura_ok = "OK" if not any("Import" in e or "circular" in e for e in errores) else "ERROR"
         logging_ok = "OK" if not any("logging" in e or "logs/" in e for e in errores) else "ERROR"
+        manifest_ok = "OK" if not any("manifest" in e or "Hash" in e for e in errores) else "ERROR"
 
         contenido = (
             "# Informe de Auditoría\n\n"
@@ -224,6 +265,8 @@ class AuditarProyectoGenerado:
             f"Resultado: {arquitectura_ok}\n\n"
             "## Validación logging\n"
             f"Resultado: {logging_ok}\n\n"
+            "## Consistencia manifest/hash\n"
+            f"Resultado: {manifest_ok}\n\n"
             "## Resultado pytest\n"
             f"Código de salida: {resultado_pytest.codigo_salida}\n\n"
             "```\n"

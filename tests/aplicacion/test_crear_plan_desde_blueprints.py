@@ -2,7 +2,8 @@ import pytest
 
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.puertos.blueprint import Blueprint, RepositorioBlueprints
-from dominio.modelos import ArchivoGenerado, EspecificacionProyecto, ErrorValidacionDominio, PlanGeneracion
+from aplicacion.errores import ErrorConflictoArchivos
+from dominio.modelos import ArchivoGenerado, EspecificacionProyecto, PlanGeneracion
 
 
 class BlueprintDoble(Blueprint):
@@ -55,5 +56,5 @@ def test_crear_plan_desde_blueprints_detecta_conflictos() -> None:
     ])
     especificacion = EspecificacionProyecto("demo", "/tmp/demo")
 
-    with pytest.raises(ErrorValidacionDominio, match="duplicadas"):
+    with pytest.raises(ErrorConflictoArchivos, match="duplicadas"):
         CrearPlanDesdeBlueprints(repo).ejecutar(especificacion, ["a", "b"])

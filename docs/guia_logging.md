@@ -1,19 +1,12 @@
 # Guía de logging
 
-## Archivos de log
-- `logs/seguimiento.log`: eventos de seguimiento (DEBUG/INFO y superiores).
-- `logs/crashes.log`: errores y fallos críticos (ERROR/CRITICAL) con stacktrace.
+## Ubicación
+- `logs/seguimiento.log`: trazas operativas.
+- `logs/crashes.log`: errores y excepciones no controladas.
 
-## Rotación
-Se utiliza `RotatingFileHandler` con tamaño máximo por archivo y backups.
+## Política de errores
+- UI y CLI muestran mensajes útiles al usuario (sin stacktrace).
+- Los detalles técnicos se registran en `crashes.log`.
 
-## Formato
-Cada registro usa el formato:
-
-`timestamp | nivel | módulo | función | mensaje`
-
-## Manejo de excepciones globales
-Se instala `sys.excepthook` para registrar excepciones no controladas en `crashes.log`.
-
-## Filtrado básico de secretos
-Se descartan líneas que contengan palabras sensibles: `password`, `token`, `secret`.
+## Auditoría
+El resultado consolidado se guarda en `docs/informe_auditoria.md` incluso si hay fallo en el proceso.

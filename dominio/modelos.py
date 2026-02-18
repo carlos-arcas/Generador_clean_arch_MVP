@@ -179,6 +179,24 @@ class EspecificacionProyecto:
         return self.clases.copy()
 
 
+
+
+@dataclass
+class PresetProyecto:
+    """Configuración reusable para generación de proyecto."""
+
+    nombre_preset: str
+    especificacion: EspecificacionProyecto
+    blueprints: list[str]
+    opciones: dict[str, Any] = field(default_factory=dict)
+
+    def validar(self) -> None:
+        if not self.nombre_preset or not self.nombre_preset.strip():
+            raise ErrorValidacionDominio("El nombre del preset no puede estar vacío.")
+        self.especificacion.validar()
+        if not self.blueprints:
+            raise ErrorValidacionDominio("El preset debe incluir al menos un blueprint.")
+
 @dataclass(frozen=True)
 class ArchivoGenerado:
     """Representa un archivo a crear dentro del plan de generación."""

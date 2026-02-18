@@ -1,15 +1,5 @@
-# generador_base_proyectos
+# Documentación v1.0.0
 
-Herramienta interna en Python para crear esqueletos base de proyectos con enfoque de Clean Architecture.
-
-## Ejecución de la aplicación
-1. Abrir una terminal en la raíz del repositorio.
-2. Ejecutar:
-   - `scripts\lanzar_app.bat`
-
-## Ejecución de pruebas
-1. Abrir una terminal en la raíz del repositorio.
-2. Ejecutar:
-   - `scripts\ejecutar_tests.bat`
-
-El script de pruebas corre test unitarios rápidos y luego cobertura con umbral mínimo de 85%.
+- `arquitectura.md`: flujo completo y componentes por capa.
+- `guia_pruebas.md`: ejecución de pruebas, cobertura y regresión por snapshots.
+- `guia_logging.md`: archivos de log y diagnóstico.
