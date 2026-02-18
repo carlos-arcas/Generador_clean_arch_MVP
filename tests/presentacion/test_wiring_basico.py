@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import pytest
 from unittest.mock import Mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+QtWidgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
+QApplication = QtWidgets.QApplication
 
 from aplicacion.casos_uso.auditar_proyecto_generado import ResultadoAuditoria
 from dominio.modelos import EspecificacionProyecto
@@ -25,7 +27,7 @@ def _app() -> QApplication:
 
 def test_instanciar_ventana_principal() -> None:
     _app()
-    ventana = VentanaPrincipal(version_generador="0.5.0")
+    ventana = VentanaPrincipal(version_generador="0.6.0")
 
     assert ventana.windowTitle() == "Generador Base Proyectos"
     assert ventana.wizard is not None
@@ -36,7 +38,7 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
         nombre_proyecto="demo",
         ruta_destino="salida/demo",
         descripcion="demo",
-        version="0.5.0",
+        version="0.6.0",
     )
     mock_plan = object()
 
@@ -55,7 +57,7 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
         crear_plan_desde_blueprints=crear_plan,
         ejecutar_plan=ejecutar_plan,
         auditor=auditor,
-        version_generador="0.5.0",
+        version_generador="0.6.0",
     )
 
     eventos_finalizados: list[ResultadoGeneracion] = []
@@ -65,6 +67,9 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
 
     crear_plan.ejecutar.assert_called_once_with(especificacion, ["base_clean_arch", "crud_json"])
     ejecutar_plan.ejecutar.assert_called_once()
-    auditor.ejecutar.assert_called_once_with("salida/demo")
+    auditor.ejecutar.assert_called_once_with(
+        "salida/demo",
+        blueprints_usados=["base_clean_arch", "crud_json"],
+    )
     assert eventos_finalizados
     assert eventos_finalizados[0].auditoria.valido is True

@@ -44,6 +44,7 @@ from aplicacion.casos_uso.gestion_clases import (
 )
 from dominio.modelos import ErrorValidacionDominio, EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
+from infraestructura.ejecutor_procesos_subprocess import EjecutorProcesosSubprocess
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.repositorio_especificacion_proyecto_en_memoria import RepositorioEspecificacionProyectoEnMemoria
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
@@ -419,7 +420,7 @@ class WizardProyecto(QWizard):
                 sistema_archivos=SistemaArchivosReal(),
                 generador_manifest=GenerarManifest(CalculadoraHashReal()),
             ),
-            auditor=AuditarProyectoGenerado(),
+            auditor=AuditarProyectoGenerado(EjecutorProcesosSubprocess()),
             version_generador=self._version_generador,
         )
 
@@ -435,21 +436,24 @@ class WizardProyecto(QWizard):
         self._set_controles_habilitados(True)
         self.pagina_resumen.marcar_finalizado()
         LOGGER.info(
-            "Resultado auditoría en UI: valido=%s errores=%s",
+            "Resultado auditoría en UI: valido=%s cobertura=%s resumen=%s errores=%s",
             resultado.auditoria.valido,
+            resultado.auditoria.cobertura,
+            resultado.auditoria.resumen,
             resultado.auditoria.lista_errores,
         )
         if resultado.auditoria.valido:
             QMessageBox.information(
                 self,
                 "Generación finalizada",
-                f"Proyecto generado correctamente en:\n{resultado.ruta_destino}",
+                f"Proyecto generado correctamente en:\n{resultado.ruta_destino}\n\n{resultado.auditoria.resumen}",
             )
             return
+        LOGGER.error("Auditoría rechazada. Detalles enviados a crashes.log: %s", resultado.auditoria.lista_errores)
         QMessageBox.warning(
             self,
-            "Auditoría con observaciones",
-            "\n".join(resultado.auditoria.lista_errores),
+            "Auditoría RECHAZADA",
+            f"{resultado.auditoria.resumen}\n\n" + "\n".join(resultado.auditoria.lista_errores),
         )
 
     def _on_generacion_error(self, error: Exception) -> None:

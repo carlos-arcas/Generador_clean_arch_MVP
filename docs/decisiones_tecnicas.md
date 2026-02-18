@@ -43,3 +43,21 @@ Se adopta `QRunnable` en lugar de `QThread` dedicado porque la generación es un
 
 ## Separación modelos Qt / dominio
 Los `QAbstractTableModel` (`ModeloClases`, `ModeloAtributos`) operan en modo lectura sobre entidades de dominio (`EspecificacionClase`, `EspecificacionAtributo`). Las mutaciones ocurren exclusivamente vía casos de uso (`AgregarClase`, `EditarAtributo`, etc.). Esta decisión evita duplicar reglas en widgets y preserva Clean Architecture: presentación adapta datos; dominio/aplicación gobiernan invariantes.
+
+## Auditoría de imports por análisis estático simple (v0.6.0)
+Se implementa análisis estático básico con lectura de archivos `.py` y regex (`import X`, `from X import ...`) sin dependencias externas. Motivos:
+- mantener el generador liviano,
+- evitar acoplarse a parsers complejos,
+- cubrir reglas de arquitectura objetivo de forma determinista y testeable.
+
+## Ejecución externa de pytest+coverage desde auditor
+La cobertura del proyecto generado se valida ejecutando `pytest --cov=. --cov-report=term` dentro de la carpeta generada. Motivos:
+- verificar calidad real del artefacto generado (no solo del generador),
+- detectar fallos de wiring entre archivos y tests del proyecto destino,
+- emitir un resultado de auditoría accionable con umbral explícito (>=85%).
+
+## Puerto `EjecutorProcesos` para comandos externos
+La ejecución de procesos se modela como puerto (`EjecutorProcesos`) con implementación concreta en infraestructura (`EjecutorProcesosSubprocess`). Motivos:
+- preservar inversión de dependencias en Clean Architecture,
+- permitir pruebas unitarias del auditor con mocks de cobertura 90%/70% sin lanzar `pytest` real,
+- aislar detalles de `subprocess` fuera de la capa de aplicación.

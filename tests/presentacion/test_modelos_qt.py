@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import Qt
+QtCore = pytest.importorskip("PySide6.QtCore", exc_type=ImportError)
+Qt = QtCore.Qt
 
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase
 from presentacion.modelos_qt.modelo_atributos import ModeloAtributos

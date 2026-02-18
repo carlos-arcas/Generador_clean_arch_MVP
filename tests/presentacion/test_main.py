@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import os
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+QtWidgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 
 from presentacion import __main__ as modulo_main
 

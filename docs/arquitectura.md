@@ -82,3 +82,13 @@ Relación permitida:
 5. La UI recibe `finalizado/error`, reactiva controles y notifica resultado.
 
 Este flujo evita bloqueo de interfaz y mantiene dependencia hacia adentro: la UI no implementa validaciones de negocio ni operaciones de IO directamente.
+
+## Auditor avanzado (v0.6.0)
+- `aplicacion/casos_uso/auditar_proyecto_generado.py` evoluciona a auditoría integral con cuatro bloques:
+  1. Estructura obligatoria del proyecto generado.
+  2. Reglas de arquitectura por imports (prohibiciones por capa y ciclo básico).
+  3. Verificación de logging (`infraestructura/logging_config.py`, `logs/seguimiento.log`, `logs/crashes.log`).
+  4. Ejecución de `pytest --cov=. --cov-report=term` y validación de cobertura >= 85%.
+- La ejecución de comandos se abstrae con el puerto `EjecutorProcesos`, implementado por `infraestructura/ejecutor_procesos_subprocess.py`.
+- El auditor genera `docs/informe_auditoria.md` dentro del proyecto generado para trazabilidad post-ejecución.
+- `presentacion` solo consume el resumen (`ResultadoAuditoria.resumen`) y errores, manteniendo la lógica de auditoría encapsulada en aplicación.
