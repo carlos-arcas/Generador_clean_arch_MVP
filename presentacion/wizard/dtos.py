@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from dominio.modelos import EspecificacionProyecto
 
@@ -17,3 +17,6 @@ class DatosWizardProyecto:
     version: str
     especificacion_proyecto: EspecificacionProyecto
     persistencia: str
+    usuario_credencial: str = ""
+    secreto_credencial: str = field(default="", repr=False)
+    guardar_credencial: bool = False

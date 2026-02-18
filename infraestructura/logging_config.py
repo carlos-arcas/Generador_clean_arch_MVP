@@ -1,22 +1,32 @@
-"""Configuración centralizada de logging con rotación y filtrado de secretos."""
+"""Configuración centralizada de logging con rotación y sanitización de secretos."""
 
 from __future__ import annotations
 
 from logging.handlers import RotatingFileHandler
 import logging
 from pathlib import Path
+import re
 import sys
 
 
 class FiltroSecretos(logging.Filter):
-    """Filtra mensajes que podrían contener secretos básicos."""
+    """Oculta valores sensibles en mensajes y argumentos de log."""
 
-    PALABRAS_SENSIBLES = ("password", "token", "secret")
+    PALABRAS_SENSIBLES = ("password", "secret", "token", "api_key", "clave")
+
+    def __init__(self) -> None:
+        palabras = "|".join(re.escape(palabra) for palabra in self.PALABRAS_SENSIBLES)
+        self._patron = re.compile(rf"(?P<k>{palabras})\s*[:=]\s*(?P<v>[^,\s]+)", re.IGNORECASE)
+        super().__init__()
+
+    def _sanitizar(self, texto: str) -> str:
+        return self._patron.sub(lambda m: f"{m.group('k')}=***", texto)
 
     def filter(self, record: logging.LogRecord) -> bool:
-        mensaje = record.getMessage().lower()
-        if any(palabra in mensaje for palabra in self.PALABRAS_SENSIBLES):
-            return False
+        record.msg = self._sanitizar(str(record.msg))
+        if record.args:
+            args = record.args if isinstance(record.args, tuple) else (record.args,)
+            record.args = tuple(self._sanitizar(str(arg)) for arg in args)
         return True
 
 

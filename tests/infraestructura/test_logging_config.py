@@ -10,7 +10,7 @@ def test_configurar_logging_crea_archivos_y_filtra_secretos(tmp_path: Path) -> N
     logger = logging.getLogger("prueba_logging")
 
     logger.info("mensaje visible")
-    logger.error("este mensaje contiene token y no debe persistirse")
+    logger.error("este mensaje contiene token=abcd1234 y no debe persistirse")
 
     seguimiento = tmp_path / "seguimiento.log"
     crashes = tmp_path / "crashes.log"
@@ -18,7 +18,9 @@ def test_configurar_logging_crea_archivos_y_filtra_secretos(tmp_path: Path) -> N
     assert seguimiento.exists()
     assert crashes.exists()
     assert "mensaje visible" in seguimiento.read_text(encoding="utf-8")
-    assert "token" not in seguimiento.read_text(encoding="utf-8").lower()
+    contenido = seguimiento.read_text(encoding="utf-8").lower()
+    assert "token=***" in contenido
+    assert "abcd1234" not in contenido
 
 
 def test_configurar_logging_instala_excepthook() -> None:

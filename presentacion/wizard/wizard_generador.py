@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 import logging
 
 from PySide6.QtCore import QThreadPool
@@ -24,13 +23,16 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
 )
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
 from aplicacion.casos_uso.presets import CargarPresetProyecto, GuardarPresetProyecto
+from aplicacion.casos_uso.seguridad import GuardarCredencial
 from dominio.modelos import EspecificacionProyecto
+from dominio.seguridad import Credencial
 from dominio.preset.preset_proyecto import PresetProyecto
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
 from infraestructura.plugins.descubridor_plugins import DescubridorPlugins
 from infraestructura.presets.repositorio_presets_json import RepositorioPresetsJson
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
+from infraestructura.seguridad import SelectorRepositorioCredenciales
 from presentacion.wizard.dtos import DatosWizardProyecto
 from presentacion.wizard.paginas.pagina_clases import PaginaClases
 from presentacion.wizard.paginas.pagina_datos_proyecto import PaginaDatosProyecto
@@ -58,6 +60,9 @@ class ControladorWizardProyecto:
             version=wizard.pagina_datos.campo_version.text().strip(),
             especificacion_proyecto=wizard.especificacion_proyecto,
             persistencia=wizard.pagina_persistencia.persistencia_seleccionada(),
+            usuario_credencial=wizard.pagina_persistencia.usuario_credencial(),
+            secreto_credencial=wizard.pagina_persistencia.secreto_credencial(),
+            guardar_credencial=wizard.pagina_persistencia.guardar_credencial_segura(),
         )
 
 
@@ -70,6 +75,7 @@ class WizardGeneradorProyectos(QWizard):
         generador_mvp: GenerarProyectoMvp | None = None,
         guardar_preset: GuardarPresetProyecto | None = None,
         cargar_preset: CargarPresetProyecto | None = None,
+        guardar_credencial: GuardarCredencial | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("Generador Base Proyectos")
@@ -94,6 +100,9 @@ class WizardGeneradorProyectos(QWizard):
 
         self._guardar_preset = guardar_preset or GuardarPresetProyecto(RepositorioPresetsJson())
         self._cargar_preset = cargar_preset or CargarPresetProyecto(RepositorioPresetsJson())
+        self._guardar_credencial = guardar_credencial or GuardarCredencial(
+            SelectorRepositorioCredenciales().crear()
+        )
 
         self.especificacion_proyecto = EspecificacionProyecto(nombre_proyecto="", ruta_destino="")
 
@@ -125,7 +134,37 @@ class WizardGeneradorProyectos(QWizard):
 
     def _al_finalizar(self) -> None:
         dto = self._controlador.construir_dto(self)
-        LOGGER.info("Configuración wizard lista: %s", asdict(dto))
+        LOGGER.info(
+            "Configuración wizard lista: nombre=%s ruta=%s persistencia=%s usuario_configurado=%s guardar_credencial=%s",
+            dto.nombre,
+            dto.ruta,
+            dto.persistencia,
+            bool(dto.usuario_credencial),
+            dto.guardar_credencial,
+        )
+
+        if dto.guardar_credencial and dto.usuario_credencial and dto.secreto_credencial:
+            identificador = f"generador:{dto.nombre}:{dto.persistencia.lower()}"
+            try:
+                self._guardar_credencial.ejecutar(
+                    Credencial(
+                        identificador=identificador,
+                        usuario=dto.usuario_credencial,
+                        secreto=dto.secreto_credencial,
+                        tipo=dto.persistencia,
+                    )
+                )
+                LOGGER.info("Credencial almacenada de forma segura para identificador=%s", identificador)
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.warning(
+                    "No se pudo persistir credencial en almacenamiento seguro. Se continuará solo en memoria. %s",
+                    exc,
+                )
+                QMessageBox.warning(
+                    self,
+                    "Credenciales",
+                    "No se pudo guardar la credencial en el sistema seguro. Se usará únicamente en memoria durante esta ejecución.",
+                )
 
         entrada = GenerarProyectoMvpEntrada(
             especificacion_proyecto=dto.especificacion_proyecto,

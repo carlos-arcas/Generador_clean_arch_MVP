@@ -1,10 +1,9 @@
 # Changelog
 
-## [1.5.2] - 2026-02-18
+## [1.6.0] - 2026-02-18
 
 ### Añadido
-- Test de integración completo del generador MVP.
-
+- Gestión segura de credenciales con almacenamiento protegido.
 
 ## [1.5.1] - 2026-02-18
 

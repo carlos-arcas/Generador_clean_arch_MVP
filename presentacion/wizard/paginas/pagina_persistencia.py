@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QAbstractItemView,
+    QCheckBox,
     QRadioButton,
     QVBoxLayout,
     QWizardPage,
@@ -28,6 +30,19 @@ class PaginaPersistencia(QWizardPage):
         layout = QVBoxLayout(self)
         layout.addWidget(self.radio_json)
         layout.addWidget(self.radio_sqlite)
+
+        self.etiqueta_credenciales = QLabel("Credenciales de conexión (opcional):")
+        self.campo_usuario = QLineEdit()
+        self.campo_usuario.setPlaceholderText("Usuario DB/CRM")
+        self.campo_password = QLineEdit()
+        self.campo_password.setPlaceholderText("Password / token")
+        self.campo_password.setEchoMode(QLineEdit.Password)
+        self.checkbox_guardar_seguro = QCheckBox("Guardar credencial en sistema seguro")
+
+        layout.addWidget(self.etiqueta_credenciales)
+        layout.addWidget(self.campo_usuario)
+        layout.addWidget(self.campo_password)
+        layout.addWidget(self.checkbox_guardar_seguro)
 
         self.etiqueta_blueprints = QLabel("Blueprints a aplicar (internos y plugins externos):")
         self.lista_blueprints = QListWidget()
@@ -62,3 +77,13 @@ class PaginaPersistencia(QWizardPage):
 
     def blueprints_seleccionados(self) -> list[str]:
         return [item.data(256) for item in self.lista_blueprints.selectedItems()]
+
+
+    def usuario_credencial(self) -> str:
+        return self.campo_usuario.text().strip()
+
+    def secreto_credencial(self) -> str:
+        return self.campo_password.text()
+
+    def guardar_credencial_segura(self) -> bool:
+        return self.checkbox_guardar_seguro.isChecked()
