@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+
 from PySide6.QtWidgets import QFileDialog, QFormLayout, QHBoxLayout, QLineEdit, QPushButton, QWizardPage
+
+LOGGER = logging.getLogger(__name__)
 
 
 class PaginaDatosProyecto(QWizardPage):
@@ -17,9 +21,10 @@ class PaginaDatosProyecto(QWizardPage):
         self.campo_ruta = QLineEdit()
         self.campo_descripcion = QLineEdit()
         self.campo_version = QLineEdit("1.0.1")
+        self._estado_complete = self.isComplete()
 
-        self.campo_nombre.textChanged.connect(self.completeChanged.emit)
-        self.campo_ruta.textChanged.connect(self.completeChanged.emit)
+        self.campo_nombre.textChanged.connect(self._on_cambio_campos)
+        self.campo_ruta.textChanged.connect(self._on_cambio_campos)
 
         boton_ruta = QPushButton("Seleccionar carpeta…")
         boton_ruta.clicked.connect(self._seleccionar_carpeta)
@@ -38,6 +43,18 @@ class PaginaDatosProyecto(QWizardPage):
         ruta = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta de destino")
         if ruta:
             self.campo_ruta.setText(ruta)
+            self._on_cambio_campos()
+
+    def _on_cambio_campos(self) -> None:
+        estado_actual = self.isComplete()
+        if estado_actual != self._estado_complete:
+            LOGGER.debug(
+                "Completitud en página de datos actualizada: %s -> %s",
+                self._estado_complete,
+                estado_actual,
+            )
+            self._estado_complete = estado_actual
+        self.completeChanged.emit()
 
     def isComplete(self) -> bool:  # noqa: N802
         return bool(self.campo_nombre.text().strip()) and bool(self.campo_ruta.text().strip())
