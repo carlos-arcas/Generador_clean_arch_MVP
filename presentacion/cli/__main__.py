@@ -18,6 +18,7 @@ from infraestructura.calculadora_hash_real import CalculadoraHashReal
 from infraestructura.ejecutor_procesos_subprocess import EjecutorProcesosSubprocess
 from infraestructura.logging_config import configurar_logging
 from infraestructura.manifest_en_disco import EscritorManifestSeguro, LectorManifestEnDisco
+from infraestructura.plugins.descubridor_plugins import DescubridorPlugins
 from infraestructura.presets.repositorio_presets_json import RepositorioPresetsJson
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
@@ -33,6 +34,12 @@ def construir_parser() -> argparse.ArgumentParser:
     generar.add_argument("--preset", required=True, help="Nombre del preset (sin .json)")
     generar.add_argument("--destino", required=True, help="Ruta destino del proyecto")
     generar.add_argument("--patch", action="store_true", help="Fuerza ejecución en modo patch")
+    generar.add_argument(
+        "--blueprint",
+        action="append",
+        default=[],
+        help="Blueprint a aplicar (repetible, soporta internos y plugins)",
+    )
 
     validar = subparsers.add_parser("validar-preset", help="Valida un preset")
     validar.add_argument("--preset", required=True, help="Nombre del preset (sin .json)")
@@ -48,7 +55,12 @@ def _ejecutar_generar(args: argparse.Namespace) -> int:
     preset = cargador.ejecutar(args.preset)
     preset.especificacion.ruta_destino = args.destino
 
-    crear_plan = CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco())
+    blueprints_objetivo = args.blueprint or preset.blueprints
+
+    crear_plan = CrearPlanDesdeBlueprints(
+        RepositorioBlueprintsEnDisco(),
+        descubridor_plugins=DescubridorPlugins(),
+    )
     crear_plan_patch = CrearPlanPatchDesdeBlueprints(
         lector_manifest=LectorManifestEnDisco(),
         crear_plan_desde_blueprints=crear_plan,
@@ -63,14 +75,14 @@ def _ejecutar_generar(args: argparse.Namespace) -> int:
     if modo_patch:
         plan = crear_plan_patch.ejecutar(preset.especificacion, args.destino)
     else:
-        plan = crear_plan.ejecutar(preset.especificacion, preset.blueprints)
+        plan = crear_plan.ejecutar(preset.especificacion, blueprints_objetivo)
 
     ejecutar_plan.ejecutar(
         plan=plan,
         ruta_destino=args.destino,
         opciones=preset.metadata,
         version_generador=Path("VERSION").read_text(encoding="utf-8").strip(),
-        blueprints_usados=[f"{nombre}@1.0.0" for nombre in preset.blueprints],
+        blueprints_usados=[f"{nombre}@1.0.0" for nombre in blueprints_objetivo],
         generar_manifest=not modo_patch,
     )
     if modo_patch:

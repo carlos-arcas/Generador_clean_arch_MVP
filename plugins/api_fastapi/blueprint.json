@@ -1,0 +1,8 @@
+{
+  "nombre": "api_fastapi",
+  "version": "1.0.0",
+  "descripcion": "Generador API REST con FastAPI",
+  "compatible_con": ["base_clean_arch"],
+  "capas": ["presentacion"],
+  "requiere": []
+}

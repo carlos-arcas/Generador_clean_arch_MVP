@@ -27,6 +27,7 @@ from aplicacion.casos_uso.presets import CargarPresetProyecto, GuardarPresetProy
 from dominio.modelos import EspecificacionProyecto
 from dominio.preset.preset_proyecto import PresetProyecto
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
+from infraestructura.plugins.descubridor_plugins import DescubridorPlugins
 from infraestructura.presets.repositorio_presets_json import RepositorioPresetsJson
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
@@ -39,7 +40,7 @@ from presentacion.wizard.trabajadores.trabajador_generacion import TrabajadorGen
 
 LOGGER = logging.getLogger(__name__)
 
-BLUEPRINTS_MVP = ["base_clean_arch_v1", "crud_json_v1"]
+BLUEPRINTS_MVP = ["base_clean_arch", "crud_json"]
 
 
 class ControladorWizardProyecto:
@@ -76,10 +77,14 @@ class WizardGeneradorProyectos(QWizard):
         self._controlador = controlador or ControladorWizardProyecto()
         self._pool = QThreadPool.globalInstance()
         self._trabajador_activo: TrabajadorGeneracionMvp | None = None
+        self._repositorio_blueprints = RepositorioBlueprintsEnDisco("blueprints")
+        self._descubridor_plugins = DescubridorPlugins("plugins")
 
         if generador_mvp is None:
-            repositorio_blueprints = RepositorioBlueprintsEnDisco("blueprints")
-            crear_plan = CrearPlanDesdeBlueprints(repositorio_blueprints)
+            crear_plan = CrearPlanDesdeBlueprints(
+                self._repositorio_blueprints,
+                descubridor_plugins=self._descubridor_plugins,
+            )
             generar_manifest = GenerarManifest(CalculadoraHashReal())
             ejecutar_plan = EjecutarPlan(SistemaArchivosReal(), generar_manifest)
             sistema_archivos = SistemaArchivosReal()
@@ -116,6 +121,8 @@ class WizardGeneradorProyectos(QWizard):
         self.pagina_datos.boton_cargar_preset.clicked.connect(self._cargar_preset_desde_ui)
         self.button(QWizard.FinishButton).clicked.connect(self._al_finalizar)
 
+        self._cargar_catalogo_blueprints()
+
     def _al_finalizar(self) -> None:
         dto = self._controlador.construir_dto(self)
         LOGGER.info("Configuración wizard lista: %s", asdict(dto))
@@ -124,7 +131,7 @@ class WizardGeneradorProyectos(QWizard):
             especificacion_proyecto=dto.especificacion_proyecto,
             ruta_destino=dto.ruta,
             nombre_proyecto=dto.nombre,
-            blueprints=BLUEPRINTS_MVP,
+            blueprints=self._blueprints_seleccionados(),
         )
         self._cambiar_estado_generando(True, "Generando...")
 
@@ -150,7 +157,7 @@ class WizardGeneradorProyectos(QWizard):
             preset = PresetProyecto(
                 nombre=nombre,
                 especificacion=self.especificacion_proyecto,
-                blueprints=BLUEPRINTS_MVP,
+                blueprints=self._blueprints_seleccionados(),
                 metadata={"persistencia": self.pagina_persistencia.persistencia_seleccionada()},
             )
             ruta = self._guardar_preset.ejecutar(preset)
@@ -190,7 +197,36 @@ class WizardGeneradorProyectos(QWizard):
         persistencia = str(preset.metadata.get("persistencia", "JSON"))
         self.pagina_persistencia.establecer_persistencia(persistencia)
         self.pagina_clases.establecer_desde_especificacion(self.especificacion_proyecto)
+        self.pagina_persistencia.establecer_blueprints_disponibles(
+            self._catalogo_blueprints,
+            preset.blueprints,
+        )
         self.pagina_resumen.initializePage()
+
+    def _cargar_catalogo_blueprints(self) -> None:
+        internos = [
+            (blueprint.nombre(), blueprint.version(), "Blueprint interno")
+            for blueprint in self._repositorio_blueprints.listar_blueprints()
+        ]
+        externos = [
+            (plugin.nombre, plugin.version, plugin.descripcion)
+            for plugin in self._descubridor_plugins.listar_plugins()
+        ]
+        catalogo_unico: dict[str, tuple[str, str, str]] = {
+            nombre: (nombre, version, descripcion)
+            for nombre, version, descripcion in [*internos, *externos]
+        }
+        self._catalogo_blueprints = sorted(catalogo_unico.values(), key=lambda item: item[0])
+        self.pagina_persistencia.establecer_blueprints_disponibles(
+            self._catalogo_blueprints,
+            BLUEPRINTS_MVP,
+        )
+
+    def _blueprints_seleccionados(self) -> list[str]:
+        seleccionados = self.pagina_persistencia.blueprints_seleccionados()
+        if seleccionados:
+            return seleccionados
+        return BLUEPRINTS_MVP
 
     def _sincronizar_especificacion_desde_campos(self) -> None:
         self.especificacion_proyecto.nombre_proyecto = self.pagina_datos.campo_nombre.text().strip()
