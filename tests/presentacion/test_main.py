@@ -20,21 +20,17 @@ class _FakeApp:
         return 0
 
 
-class _FakeVentana:
-    def __init__(self, version_generador: str) -> None:
-        self.version_generador = version_generador
-        self.mostrada = False
+class _FakeWizard:
+    def __init__(self) -> None:
+        self.mostrado = False
 
     def show(self) -> None:
-        self.mostrada = True
+        self.mostrado = True
 
 
-def test_main_inicializa_app_qt(monkeypatch, tmp_path) -> None:
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "VERSION").write_text("0.5.0", encoding="utf-8")
-
+def test_main_inicializa_app_qt(monkeypatch) -> None:
     monkeypatch.setattr(modulo_main, "QApplication", _FakeApp)
-    monkeypatch.setattr(modulo_main, "VentanaPrincipal", _FakeVentana)
+    monkeypatch.setattr(modulo_main, "WizardGeneradorProyectos", _FakeWizard)
 
     codigo = modulo_main.main()
 
