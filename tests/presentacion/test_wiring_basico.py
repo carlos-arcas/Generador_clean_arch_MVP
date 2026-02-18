@@ -11,7 +11,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 QtWidgets = pytest.importorskip("PySide6.QtWidgets", exc_type=ImportError)
 QApplication = QtWidgets.QApplication
 
-from aplicacion.casos_uso.auditar_proyecto_generado import ResultadoAuditoria
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from dominio.modelos import EspecificacionProyecto
 from presentacion.trabajadores.trabajador_generacion import ResultadoGeneracion, TrabajadorGeneracion
 from presentacion.ventana_principal import VentanaPrincipal
@@ -50,7 +51,7 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
     crear_plan_patch = Mock()
     actualizar_manifest_patch = Mock()
 
-    resultado_auditoria = ResultadoAuditoria(valido=True, lista_errores=[])
+    resultado_auditoria = DtoAuditoriaSalida(valido=True, lista_errores=[])
     auditor = Mock()
     auditor.ejecutar.return_value = resultado_auditoria
 
@@ -75,8 +76,10 @@ def test_trabajador_generacion_invoca_casos_de_uso() -> None:
     ejecutar_plan.ejecutar.assert_called_once()
     actualizar_manifest_patch.ejecutar.assert_not_called()
     auditor.ejecutar.assert_called_once_with(
-        "salida/demo",
-        blueprints_usados=["base_clean_arch", "crud_json"],
+        DtoAuditoriaEntrada(
+            ruta_proyecto="salida/demo",
+            blueprints_usados=["base_clean_arch", "crud_json"],
+        )
     )
     assert eventos_finalizados
     assert eventos_finalizados[0].auditoria.valido is True

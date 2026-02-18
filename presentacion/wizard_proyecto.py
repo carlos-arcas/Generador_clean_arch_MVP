@@ -555,7 +555,10 @@ class WizardProyecto(QWizard):
                 escritor_manifest=EscritorManifestSeguro(),
                 calculadora_hash=CalculadoraHashReal(),
             ),
-            auditor=AuditarProyectoGenerado(EjecutorProcesosSubprocess()),
+            auditor=AuditarProyectoGenerado(
+                ejecutor_procesos=EjecutorProcesosSubprocess(),
+                calculadora_hash=CalculadoraHashReal(),
+            ),
             version_generador=self._version_generador,
         )
 

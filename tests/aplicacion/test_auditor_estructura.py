@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.puertos.calculadora_hash import CalculadoraHash
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
 
 
@@ -12,6 +14,11 @@ class EjecutorFalso(EjecutorProcesos):
         return self._resultado
 
 
+
+
+class CalculadoraHashFalsa(CalculadoraHash):
+    def calcular_sha256(self, ruta_absoluta: str) -> str:
+        return "hash_falso"
 def _crear_base_valida(base: Path) -> None:
     (base / "dominio").mkdir(parents=True)
     (base / "aplicacion").mkdir(parents=True)
@@ -33,7 +40,7 @@ def test_auditor_estructura_valida_crea_informe(tmp_path: Path) -> None:
     _crear_base_valida(tmp_path)
     ejecutor = EjecutorFalso(ResultadoProceso(0, "TOTAL 10 1 90%", ""))
 
-    resultado = AuditarProyectoGenerado(ejecutor).ejecutar(str(tmp_path), blueprints_usados=["base_clean_arch"])
+    resultado = AuditarProyectoGenerado(ejecutor, CalculadoraHashFalsa()).ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(tmp_path), blueprints_usados=["base_clean_arch"]))
 
     assert resultado.valido is True
     assert resultado.cobertura == 90.0
@@ -43,7 +50,7 @@ def test_auditor_estructura_valida_crea_informe(tmp_path: Path) -> None:
 def test_auditor_estructura_detecta_faltantes(tmp_path: Path) -> None:
     ejecutor = EjecutorFalso(ResultadoProceso(0, "TOTAL 10 1 90%", ""))
 
-    resultado = AuditarProyectoGenerado(ejecutor).ejecutar(str(tmp_path))
+    resultado = AuditarProyectoGenerado(ejecutor, CalculadoraHashFalsa()).ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(tmp_path)))
 
     assert resultado.valido is False
     assert any("No existe el recurso obligatorio" in error for error in resultado.lista_errores)

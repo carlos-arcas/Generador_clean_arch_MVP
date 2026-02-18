@@ -7,12 +7,15 @@ from pathlib import Path
 
 import pytest
 
+from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
 )
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from dominio.excepciones.proyecto_ya_existe_error import ProyectoYaExisteError
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
@@ -43,11 +46,20 @@ def _entrada(tmp_path: Path) -> GenerarProyectoMvpEntrada:
     )
 
 
+class AuditorFalso(AuditarProyectoGenerado):
+    def __init__(self) -> None:
+        pass
+
+    def ejecutar(self, entrada: DtoAuditoriaEntrada) -> DtoAuditoriaSalida:
+        return DtoAuditoriaSalida(valido=True, lista_errores=[], warnings=[], cobertura=90.0, resumen="ok")
+
+
 def test_generacion_normal_crea_manifest_configuracion(tmp_path: Path) -> None:
     caso_uso = GenerarProyectoMvp(
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlan(SistemaArchivosReal()),
         sistema_archivos=SistemaArchivosReal(),
+        auditor=AuditorFalso(),
     )
 
     salida = caso_uso.ejecutar(_entrada(tmp_path))
@@ -68,6 +80,7 @@ def test_carpeta_existente_no_vacia_lanza_proyecto_ya_existe_error(tmp_path: Pat
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlan(SistemaArchivosReal()),
         sistema_archivos=SistemaArchivosReal(),
+        auditor=AuditorFalso(),
     )
 
     with pytest.raises(ProyectoYaExisteError):
@@ -79,6 +92,7 @@ def test_rollback_elimina_carpeta_cuando_hay_fallo_interno(tmp_path: Path) -> No
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlanFalla(),
         sistema_archivos=SistemaArchivosReal(),
+        auditor=AuditorFalso(),
     )
 
     salida = caso_uso.ejecutar(_entrada(tmp_path))

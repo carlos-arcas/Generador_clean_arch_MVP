@@ -2,35 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime
 import json
 import logging
 from pathlib import Path
 import re
 
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from aplicacion.errores import ErrorAuditoria
-from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos
-from infraestructura.calculadora_hash_real import CalculadoraHashReal
+from aplicacion.puertos.calculadora_hash import CalculadoraHash
+from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
 
 LOGGER = logging.getLogger(__name__)
-
-
-@dataclass
-class ResultadoAuditoria:
-    """Resultado detallado de la auditoría del proyecto generado."""
-
-    valido: bool
-    lista_errores: list[str] = field(default_factory=list)
-    cobertura: float | None = None
-    resumen: str = ""
-
-
-@dataclass(frozen=True)
-class ResultadoComando:
-    codigo_salida: int
-    stdout: str
-    stderr: str
 
 
 class AuditarProyectoGenerado:
@@ -49,39 +33,41 @@ class AuditarProyectoGenerado:
         "CHANGELOG.md",
     ]
 
-    def __init__(self, ejecutor_procesos: EjecutorProcesos) -> None:
+    def __init__(self, ejecutor_procesos: EjecutorProcesos, calculadora_hash: CalculadoraHash) -> None:
         self._ejecutor_procesos = ejecutor_procesos
-        self._calculadora_hash = CalculadoraHashReal()
+        self._calculadora_hash = calculadora_hash
 
-    def ejecutar(self, ruta_proyecto: str, blueprints_usados: list[str] | None = None) -> ResultadoAuditoria:
+    def ejecutar(self, entrada: DtoAuditoriaEntrada) -> DtoAuditoriaSalida:
         """Ejecuta las validaciones obligatorias sobre un proyecto ya generado."""
-        base = Path(ruta_proyecto)
+        base = Path(entrada.ruta_proyecto)
         errores: list[str] = []
-        blueprints = blueprints_usados or []
-        resultado_pytest = ResultadoComando(codigo_salida=1, stdout="No ejecutado", stderr="")
+        resultado_pytest = ResultadoProceso(codigo_salida=1, stdout="No ejecutado", stderr="")
         cobertura: float | None = None
         conclusion = "RECHAZADO"
-        LOGGER.info("Inicio auditoría avanzada proyecto=%s", ruta_proyecto)
+        LOGGER.info("Inicio auditoría avanzada proyecto=%s", entrada.ruta_proyecto)
 
         try:
-            errores.extend(self._validar_estructura(base))
-            errores.extend(self._validar_imports(base))
-            errores.extend(self._validar_logging(base))
-            errores.extend(self._validar_dependencias_informes(base, blueprints))
-            errores.extend(self._validar_consistencia_manifest(base))
+            if not base.exists() or not base.is_dir():
+                errores.append(f"La ruta '{entrada.ruta_proyecto}' no existe o no es un directorio.")
+            else:
+                errores.extend(self._validar_estructura(base))
+                errores.extend(self._validar_imports(base))
+                errores.extend(self._validar_logging(base))
+                errores.extend(self._validar_dependencias_informes(base, entrada.blueprints_usados))
+                errores.extend(self._validar_consistencia_manifest(base))
 
-            resultado_pytest = self._ejecutor_procesos.ejecutar(
-                comando=["pytest", "--cov=.", "--cov-report=term"],
-                cwd=str(base),
-            )
-            cobertura = self._extraer_cobertura_total(resultado_pytest.stdout)
-            if cobertura is None:
-                errores.append("No fue posible extraer el porcentaje total de cobertura de pytest.")
-            elif cobertura < 85.0:
-                errores.append(f"Cobertura insuficiente: {cobertura:.2f}% (mínimo requerido: 85%).")
+                resultado_pytest = self._ejecutor_procesos.ejecutar(
+                    comando=["pytest", "--cov=.", "--cov-report=term"],
+                    cwd=str(base),
+                )
+                cobertura = self._extraer_cobertura_total(resultado_pytest.stdout)
+                if cobertura is None:
+                    errores.append("No fue posible extraer el porcentaje total de cobertura de pytest.")
+                elif cobertura < 85.0:
+                    errores.append(f"Cobertura insuficiente: {cobertura:.2f}% (mínimo requerido: 85%).")
 
-            if resultado_pytest.codigo_salida != 0 and cobertura is None:
-                errores.append("La ejecución de pytest finalizó con error y sin reporte de cobertura usable.")
+                if resultado_pytest.codigo_salida != 0 and cobertura is None:
+                    errores.append("La ejecución de pytest finalizó con error y sin reporte de cobertura usable.")
 
             LOGGER.info("Cobertura total detectada: %s", cobertura)
             LOGGER.info("Errores de auditoría detectados: %s", errores)
@@ -93,7 +79,7 @@ class AuditarProyectoGenerado:
                 f"Errores: {len(errores)}. "
                 f"Cobertura: {f'{cobertura:.2f}%' if cobertura is not None else 'no disponible'}."
             )
-            return ResultadoAuditoria(
+            return DtoAuditoriaSalida(
                 valido=valido,
                 lista_errores=errores,
                 cobertura=cobertura,
@@ -101,17 +87,17 @@ class AuditarProyectoGenerado:
             )
         except Exception as exc:
             LOGGER.error("Fallo inesperado en auditoría: %s", exc, exc_info=True)
-            errores.append(f"Error de auditoría: {exc}")
             raise ErrorAuditoria(f"No fue posible completar la auditoría: {exc}") from exc
         finally:
-            self._escribir_informe(
-                base=base,
-                blueprints=blueprints,
-                errores=errores,
-                cobertura=cobertura,
-                resultado_pytest=resultado_pytest,
-                conclusion=conclusion,
-            )
+            if base.exists() and base.is_dir():
+                self._escribir_informe(
+                    base=base,
+                    blueprints=entrada.blueprints_usados,
+                    errores=errores,
+                    cobertura=cobertura,
+                    resultado_pytest=resultado_pytest,
+                    conclusion=conclusion,
+                )
 
     def _validar_estructura(self, base: Path) -> list[str]:
         LOGGER.info("Evaluando reglas de estructura")
@@ -124,7 +110,6 @@ class AuditarProyectoGenerado:
     def _validar_imports(self, base: Path) -> list[str]:
         LOGGER.info("Evaluando reglas de arquitectura por imports")
         errores: list[str] = []
-        modulos_estandar_restringidos = {"json", "sqlite3"}
         modulos_exportacion = {"openpyxl", "reportlab"}
         prefijos_externos = {"pydantic", "requests", "sqlalchemy", "fastapi", "pyside6"}
         patron_import = re.compile(r"^\s*import\s+([a-zA-Z0-9_\.]+)", re.MULTILINE)
@@ -146,20 +131,15 @@ class AuditarProyectoGenerado:
                     errores.append(f"Import sqlite3 fuera de infraestructura ({relativo}): {modulo}")
                 if modulo_raiz in modulos_exportacion and relativo.parts[0] != "infraestructura":
                     errores.append(f"Import {modulo_raiz} fuera de infraestructura ({relativo}): {modulo}")
+                if modulo_raiz in prefijos_externos and relativo.parts[0] in {"dominio", "aplicacion"}:
+                    errores.append(
+                        f"Dependencia externa no permitida en {relativo.parts[0]} ({relativo}): {modulo}"
+                    )
 
             if relativo.parts[0] == "dominio":
                 for modulo in imports:
-                    modulo_bajo = modulo.lower()
-                    if modulo_bajo.startswith("infraestructura"):
+                    if modulo.lower().startswith(("infraestructura", "presentacion", "aplicacion")):
                         errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.startswith("presentacion"):
-                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.startswith("pyside6"):
-                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.split(".")[0] in modulos_estandar_restringidos:
-                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.split(".")[0] in prefijos_externos:
-                        errores.append(f"Import externo no permitido en dominio ({relativo}): {modulo}")
             elif relativo.parts[0] == "aplicacion":
                 for modulo in imports:
                     if modulo.lower().startswith("presentacion"):
@@ -193,11 +173,12 @@ class AuditarProyectoGenerado:
         ruta_manifest = base / "manifest.json"
         if not ruta_manifest.exists():
             return []
+
         payload = json.loads(ruta_manifest.read_text(encoding="utf-8"))
         errores: list[str] = []
-        for entrada in payload.get("archivos", []):
-            ruta_relativa = entrada.get("ruta_relativa", "")
-            hash_esperado = entrada.get("hash_sha256", "")
+        for entrada_archivo in payload.get("archivos", []):
+            ruta_relativa = entrada_archivo.get("ruta_relativa", "")
+            hash_esperado = entrada_archivo.get("hash_sha256", "")
             if not ruta_relativa or not hash_esperado:
                 errores.append("manifest.json contiene entradas incompletas.")
                 continue
@@ -241,7 +222,7 @@ class AuditarProyectoGenerado:
         blueprints: list[str],
         errores: list[str],
         cobertura: float | None,
-        resultado_pytest: ResultadoComando,
+        resultado_pytest: ResultadoProceso,
         conclusion: str,
     ) -> None:
         ruta_docs = base / "docs"

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from aplicacion.errores import ErrorAplicacion, ErrorAuditoria
 from bootstrap.composition_root import configurar_logging, crear_contenedor
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
 
 LOGGER = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def _ejecutar_validar_preset(args: argparse.Namespace, contenedor) -> int:
 
 
 def _ejecutar_auditar(args: argparse.Namespace, contenedor) -> int:
-    resultado = contenedor.auditar_proyecto_generado.ejecutar(args.proyecto)
+    resultado = contenedor.auditar_proyecto_generado.ejecutar(DtoAuditoriaEntrada(ruta_proyecto=args.proyecto))
     if not resultado.valido:
         raise ErrorAuditoria("Auditoría rechazada: " + "; ".join(resultado.lista_errores))
     LOGGER.info("Auditoría aprobada: %s", resultado.resumen)

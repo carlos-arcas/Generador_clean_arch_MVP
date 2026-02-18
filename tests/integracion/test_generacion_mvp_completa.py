@@ -7,18 +7,22 @@ from pathlib import Path
 
 import pytest
 
-from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
 )
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
 from dominio.excepciones.proyecto_ya_existe_error import ProyectoYaExisteError
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
+from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos, ResultadoProceso
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
 
 
@@ -46,12 +50,18 @@ ARCHIVOS_CLAVE = [
 BLUEPRINTS_MVP = ["base_clean_arch_v1", "crud_json_v1"]
 
 
+class EjecutorPytestFalso(EjecutorProcesos):
+    def ejecutar(self, comando: list[str], cwd: str) -> ResultadoProceso:
+        return ResultadoProceso(codigo_salida=0, stdout="TOTAL 10 1 90%", stderr="")
+
+
 def _crear_caso_uso() -> GenerarProyectoMvp:
     sistema_archivos = SistemaArchivosReal()
     return GenerarProyectoMvp(
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlan(sistema_archivos, GenerarManifest(CalculadoraHashReal())),
         sistema_archivos=sistema_archivos,
+        auditor=AuditorFalso(),
     )
 
 
@@ -67,6 +77,14 @@ def _crear_especificacion(ruta_base: Path, nombre_proyecto: str) -> Especificaci
     clase.agregar_atributo(EspecificacionAtributo(nombre="edad", tipo="int", obligatorio=False))
     especificacion.agregar_clase(clase)
     return especificacion
+
+
+class AuditorFalso(AuditarProyectoGenerado):
+    def __init__(self) -> None:
+        pass
+
+    def ejecutar(self, entrada: DtoAuditoriaEntrada) -> DtoAuditoriaSalida:
+        return DtoAuditoriaSalida(valido=True, lista_errores=[], warnings=[], cobertura=90.0, resumen="ok")
 
 
 def test_generacion_mvp_completa_valida_manifest_y_auditoria(tmp_path: Path) -> None:
@@ -98,10 +116,10 @@ def test_generacion_mvp_completa_valida_manifest_y_auditoria(tmp_path: Path) -> 
     assert manifest["clases"] == [{"nombre": "Cliente", "atributos": ["nombre", "edad"]}]
     assert manifest["archivos_generados"] > 0
 
-    auditor = AuditarProyectoGenerado(ejecutar_pytest=False)
-    resultado = auditor.auditar(str(ruta_proyecto))
+    auditor = AuditarProyectoGenerado(ejecutor_procesos=EjecutorPytestFalso(), calculadora_hash=CalculadoraHashReal())
+    resultado = auditor.ejecutar(DtoAuditoriaEntrada(ruta_proyecto=str(ruta_proyecto)))
     assert resultado.valido is True
-    assert resultado.errores == []
+    assert resultado.lista_errores == []
 
 
 def test_generacion_mvp_hace_rollback_si_falla_plan(tmp_path: Path) -> None:

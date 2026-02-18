@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
@@ -11,10 +12,20 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvpEntrada,
 )
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
+
+
+class AuditorFalso(AuditarProyectoGenerado):
+    def __init__(self) -> None:
+        pass
+
+    def ejecutar(self, entrada: DtoAuditoriaEntrada) -> DtoAuditoriaSalida:
+        return DtoAuditoriaSalida(valido=True, lista_errores=[], warnings=[], cobertura=90.0, resumen="ok")
 
 
 def test_generar_proyecto_mvp_crea_estructura_minima(tmp_path: Path) -> None:
@@ -37,6 +48,7 @@ def test_generar_proyecto_mvp_crea_estructura_minima(tmp_path: Path) -> None:
         crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco("blueprints")),
         ejecutar_plan=EjecutarPlan(sistema_archivos, generar_manifest),
         sistema_archivos=sistema_archivos,
+        auditor=AuditorFalso(),
     )
 
     salida = caso_uso.ejecutar(

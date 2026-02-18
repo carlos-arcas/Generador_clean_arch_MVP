@@ -9,7 +9,9 @@ import traceback
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
-from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado, ResultadoAuditoria
+from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.dtos.auditoria.dto_auditoria_entrada import DtoAuditoriaEntrada
+from aplicacion.dtos.auditoria.dto_auditoria_salida import DtoAuditoriaSalida
 from aplicacion.casos_uso.actualizar_manifest_patch import ActualizarManifestPatch
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.crear_plan_patch_desde_blueprints import CrearPlanPatchDesdeBlueprints
@@ -24,7 +26,7 @@ class ResultadoGeneracion:
     """Resultado de alto nivel de la ejecución en background."""
 
     ruta_destino: str
-    auditoria: ResultadoAuditoria
+    auditoria: DtoAuditoriaSalida
 
 
 class SenalesTrabajadorGeneracion(QObject):
@@ -88,8 +90,10 @@ class TrabajadorGeneracion(QRunnable):
 
             self.senales.progreso.emit("Ejecutando auditoría...")
             resultado_auditoria = self._auditor.ejecutar(
-                self._especificacion.ruta_destino,
-                blueprints_usados=self._blueprints,
+                DtoAuditoriaEntrada(
+                    ruta_proyecto=self._especificacion.ruta_destino,
+                    blueprints_usados=self._blueprints,
+                )
             )
             LOGGER.info(
                 "Resultado auditoría desde worker: valido=%s cobertura=%s resumen=%s errores=%s",
