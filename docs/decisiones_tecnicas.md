@@ -36,3 +36,10 @@ La asignación de `id` ocurre dentro del repositorio JSON al momento de `crear`,
 
 ## Escritura atómica con archivo temporal + replace
 Los repositorios JSON escriben usando `tempfile.mkstemp` y `Path.replace` para minimizar riesgo de corrupción ante fallos de escritura. Esta estrategia mantiene consistencia de los archivos de datos con mecanismos del estándar de Python.
+
+
+## `QRunnable + QThreadPool` para generación en segundo plano (v0.5.0)
+Se adopta `QRunnable` en lugar de `QThread` dedicado porque la generación es una tarea discreta (job puntual) sin ciclo de vida largo. `QThreadPool` simplifica reutilización de hilos, reduce overhead de creación/destrucción y evita gestionar manualmente señales de parada. La UI mantiene una única responsabilidad: reaccionar a señales de progreso/finalización/error.
+
+## Separación modelos Qt / dominio
+Los `QAbstractTableModel` (`ModeloClases`, `ModeloAtributos`) operan en modo lectura sobre entidades de dominio (`EspecificacionClase`, `EspecificacionAtributo`). Las mutaciones ocurren exclusivamente vía casos de uso (`AgregarClase`, `EditarAtributo`, etc.). Esta decisión evita duplicar reglas en widgets y preserva Clean Architecture: presentación adapta datos; dominio/aplicación gobiernan invariantes.

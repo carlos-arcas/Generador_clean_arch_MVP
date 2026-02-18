@@ -67,3 +67,18 @@ Relación permitida:
   - `tests/aplicacion`: pruebas CRUD base para el proyecto generado.
 - La persistencia se limita a infraestructura: dominio y aplicación no conocen JSON.
 - Se genera `datos/<entidad_plural>.json` por entidad y `datos/.gitkeep` para asegurar la carpeta en el proyecto.
+
+## Capa de presentación PySide6 (v0.5.0)
+- `presentacion/ventana_principal.py` aloja el wizard y no contiene reglas de negocio.
+- `presentacion/wizard_proyecto.py` solo coordina casos de uso (`gestion_clases`, `CrearPlanDesdeBlueprints`, `EjecutarPlan`, `AuditarProyectoGenerado`).
+- `presentacion/modelos_qt` encapsula adaptadores de lectura para tablas Qt.
+- `presentacion/trabajadores/trabajador_generacion.py` ejecuta casos de uso en background usando `QRunnable`.
+
+### Flujo background
+1. El usuario configura datos + clases + blueprints en el wizard.
+2. Al pulsar **Generar**, la UI construye `EspecificacionProyecto` y crea `TrabajadorGeneracion`.
+3. `QThreadPool` ejecuta el worker fuera del hilo principal.
+4. El worker emite señales de progreso por etapas: plan, ejecución, auditoría.
+5. La UI recibe `finalizado/error`, reactiva controles y notifica resultado.
+
+Este flujo evita bloqueo de interfaz y mantiene dependencia hacia adentro: la UI no implementa validaciones de negocio ni operaciones de IO directamente.

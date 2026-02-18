@@ -2,6 +2,18 @@
 
 Todos los cambios importantes de este proyecto se documentan en este archivo.
 
+## [0.5.0] - 2026-02-18
+### Agregado
+- Nueva capa de presentación PySide6 con `VentanaPrincipal` y `WizardProyecto` de cuatro páginas (datos, clases, blueprints y resumen).
+- Modelos Qt de solo lectura (`ModeloClases`, `ModeloAtributos`) para visualizar entidades de dominio sin mutarlas desde la UI.
+- Ejecución en background con `QRunnable + QThreadPool` (`TrabajadorGeneracion`) y señales de progreso/finalización/error.
+- Logging estructurado de inicio de generación, blueprints seleccionados, resultado de auditoría y captura global de excepciones Qt en `crashes.log`.
+- Pruebas de wiring de presentación para instanciación de ventana y orquestación de casos de uso desde el trabajador.
+
+### Cambiado
+- `requirements.txt` ahora fija `PySide6` para habilitar la UI.
+- Versión del generador actualizada a `0.5.0`.
+
 ## [0.4.0] - 2026-02-18
 ### Agregado
 - Nuevo blueprint `crud_json_v1` (`crud_json@1.0.0`) para generar CRUD completo por entidad.
