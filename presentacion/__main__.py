@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 import sys
 
 from PySide6.QtWidgets import QApplication
 
 from infraestructura.logging_config import configurar_logging
-from presentacion.ventana_principal import VentanaPrincipal
+from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,12 +22,10 @@ def main() -> int:
     configurar_logging("logs")
     sys.excepthook = _capturar_excepciones_qt
 
-    version_generador = Path("VERSION").read_text(encoding="utf-8").strip()
-
-    LOGGER.info("Inicializando aplicación PySide6")
+    LOGGER.info("Inicializando aplicación PySide6 en modo wizard")
     app = QApplication(sys.argv)
-    ventana = VentanaPrincipal(version_generador=version_generador)
-    ventana.show()
+    wizard = WizardGeneradorProyectos()
+    wizard.show()
     return app.exec()
 
 

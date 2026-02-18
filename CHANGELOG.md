@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1] - 2026-02-18
+
+### Añadido
+- Añadido wizard QWizard con 4 pasos (sin generación aún).
+- DTO de presentación `DatosWizardProyecto` y controlador de recopilación de datos para desacoplar UI de la preparación de configuración.
+- Pruebas MVP del wizard para validación de completitud, clases, persistencia y resumen.
+
 ## [1.0.0] - 2026-02-18
 
 ### Añadido
