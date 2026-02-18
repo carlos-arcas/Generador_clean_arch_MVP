@@ -21,7 +21,7 @@ class _FakeApp:
 
 
 class _FakeWizard:
-    def __init__(self) -> None:
+    def __init__(self, **_kwargs) -> None:  # noqa: ANN003
         self.mostrado = False
 
     def show(self) -> None:
