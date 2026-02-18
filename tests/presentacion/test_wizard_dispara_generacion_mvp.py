@@ -48,6 +48,7 @@ def test_wizard_finalizar_dispara_caso_uso_y_bloquea_botones(
     wizard.pagina_datos.campo_nombre.setText("MiProyecto")
     wizard.pagina_datos.campo_ruta.setText("/tmp/mi_proyecto")
     wizard.pagina_clases.anadir_clase("Cliente")
+    wizard.pagina_clases.anadir_atributo(nombre_atributo="id", tipo="int", obligatorio=True)
     monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: QMessageBox.Ok)
 
     estados_durante_start: list[tuple[bool, bool, bool]] = []

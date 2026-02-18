@@ -49,7 +49,7 @@ def test_anadir_atributo_valido(wizard: WizardGeneradorProyectos) -> None:
     pagina.anadir_clase("Cliente")
 
     assert pagina.anadir_atributo(nombre_atributo="nombre", tipo="str", obligatorio=True) is True
-    clases = wizard.especificacion_proyecto.clases
+    clases = pagina.dto_clases()
     assert len(clases[0].atributos) == 1
     assert clases[0].atributos[0].nombre == "nombre"
 
@@ -69,7 +69,7 @@ def test_eliminar_atributo(wizard: WizardGeneradorProyectos) -> None:
     assert pagina.seleccionar_atributo(0) is True
 
     assert pagina.eliminar_atributo_seleccionado() is True
-    assert wizard.especificacion_proyecto.clases[0].atributos == []
+    assert pagina.dto_clases()[0].atributos == []
 
 
 def test_eliminar_clase_elimina_sus_atributos(wizard: WizardGeneradorProyectos) -> None:
@@ -78,7 +78,7 @@ def test_eliminar_clase_elimina_sus_atributos(wizard: WizardGeneradorProyectos) 
     pagina.anadir_atributo(nombre_atributo="nombre", tipo="str", obligatorio=False)
 
     assert pagina.eliminar_clase_seleccionada() is True
-    assert wizard.especificacion_proyecto.clases == []
+    assert pagina.dto_clases() == []
 
 
 def test_panel_atributos_deshabilitado_sin_clase_seleccionada(wizard: WizardGeneradorProyectos) -> None:
