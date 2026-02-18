@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.1] - 2026-02-18
+
+### Corregido
+- Scripts .bat reforzados con control de errores y logging completo.
+
+
 ## [1.5.0] - 2026-02-18
 
 ### Añadido
