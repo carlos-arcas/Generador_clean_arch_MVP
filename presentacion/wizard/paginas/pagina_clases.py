@@ -17,16 +17,11 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
-    QWizard,
     QWizardPage,
 )
 
-from dominio.modelos import (
-    ErrorValidacionDominio,
-    EspecificacionAtributo,
-    EspecificacionClase,
-    EspecificacionProyecto,
-)
+from dominio.modelos import ErrorValidacionDominio, EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
+from presentacion.wizard.servicios_ui.servicio_validaciones_clases import ServicioValidacionesClases
 
 LOGGER = logging.getLogger(__name__)
 
@@ -107,6 +102,7 @@ class PaginaClases(QWizardPage):
             boton_eliminar_atributo,
         ]
         self._actualizar_estado_panel_atributos(False)
+        self._servicio_validaciones = ServicioValidacionesClases()
         self._estado_complete = self._calcular_estado_complete_ui()
 
     def isComplete(self) -> bool:  # noqa: N802
@@ -116,7 +112,7 @@ class PaginaClases(QWizardPage):
         return self.anadir_clase(self._campo_nombre_clase.text())
 
     def anadir_clase(self, nombre_clase: str) -> bool:
-        nombre_limpio = self._normalizar_nombre(nombre_clase)
+        nombre_limpio = self._servicio_validaciones.normalizar_nombre(nombre_clase)
         if nombre_limpio is None:
             return False
 
@@ -160,7 +156,7 @@ class PaginaClases(QWizardPage):
         if clase is None:
             return False
 
-        nombre_limpio = self._normalizar_nombre(nombre_atributo)
+        nombre_limpio = self._servicio_validaciones.normalizar_nombre(nombre_atributo)
         if nombre_limpio is None:
             return False
 
@@ -233,16 +229,7 @@ class PaginaClases(QWizardPage):
 
     def _clase_seleccionada(self) -> EspecificacionClase | None:
         indice = self._lista_clases.currentRow()
-        clases = self._obtener_especificacion_proyecto().clases
-        if indice < 0 or indice >= len(clases):
-            return None
-        return clases[indice]
-
-    def _normalizar_nombre(self, nombre: str) -> str | None:
-        nombre_limpio = nombre.strip()
-        if not nombre_limpio:
-            return None
-        return nombre_limpio
+        return self._servicio_validaciones.clase_seleccionada(self.wizard(), indice)
 
     def _al_cambiar_clase_seleccionada(self, _: int) -> None:
         clase = self._clase_seleccionada()
@@ -272,13 +259,7 @@ class PaginaClases(QWizardPage):
             self._tabla_atributos.setItem(fila, 2, item_obligatorio)
 
     def _obtener_especificacion_proyecto(self) -> EspecificacionProyecto:
-        wizard = self.wizard()
-        if wizard is None or not isinstance(wizard, QWizard):
-            raise RuntimeError("La página de clases requiere estar asociada a un QWizard.")
-        especificacion = getattr(wizard, "especificacion_proyecto", None)
-        if not isinstance(especificacion, EspecificacionProyecto):
-            raise RuntimeError("El wizard no contiene una especificación de proyecto válida.")
-        return especificacion
+        return self._servicio_validaciones.obtener_especificacion(self.wizard())
 
     def _calcular_estado_complete_ui(self) -> bool:
         return self._lista_clases.count() > 0
