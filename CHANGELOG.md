@@ -2,6 +2,16 @@
 
 Todos los cambios importantes de este proyecto se documentan en este archivo.
 
+## [0.4.0] - 2026-02-18
+### Agregado
+- Nuevo blueprint `crud_json_v1` (`crud_json@1.0.0`) para generar CRUD completo por entidad.
+- Generación automática de entidad de dominio, puerto de repositorio, casos de uso CRUD, repositorio JSON y pruebas base del proyecto generado.
+- Persistencia JSON por entidad en `datos/<entidad_plural>.json` con escritura atómica y asignación incremental de IDs.
+- Pruebas de blueprint para validar rutas generadas, ausencia de duplicados y validación de especificación sin clases.
+
+### Cambiado
+- Versión del generador actualizada a `0.4.0`.
+
 ## [0.3.0] - 2026-02-18
 ### Agregado
 - Modelo de dominio para constructor dinámico: `EspecificacionClase` y `EspecificacionAtributo` con reglas de validación.

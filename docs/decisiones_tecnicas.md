@@ -27,3 +27,12 @@ Las reglas de consistencia (nombres válidos, duplicados, PascalCase, existencia
 
 ## Repositorio en memoria como primera implementación
 Se implementa `RepositorioEspecificacionProyectoEnMemoria` para habilitar pruebas unitarias deterministas sin IO de disco ni dependencias externas. Es una base para futuras implementaciones persistentes manteniendo el mismo puerto de aplicación.
+
+## Persistencia JSON como etapa intermedia
+Se incorpora un blueprint de CRUD sobre archivos JSON para entregar una persistencia útil sin sumar dependencias externas. Esto permite validar el flujo de extremo a extremo antes de introducir SQLite u otros motores.
+
+## ID incremental gestionado en repositorio
+La asignación de `id` ocurre dentro del repositorio JSON al momento de `crear`, calculando `max(id)+1`. Con esto se evita que dominio/aplicación dependan de detalles de almacenamiento y se centraliza la política de identidad en infraestructura.
+
+## Escritura atómica con archivo temporal + replace
+Los repositorios JSON escriben usando `tempfile.mkstemp` y `Path.replace` para minimizar riesgo de corrupción ante fallos de escritura. Esta estrategia mantiene consistencia de los archivos de datos con mecanismos del estándar de Python.
