@@ -218,6 +218,19 @@ class PaginaClases(QWizardPage):
     def limpiar_seleccion_clase(self) -> None:
         self._lista_clases.setCurrentRow(-1)
 
+    def establecer_desde_especificacion(self, especificacion: EspecificacionProyecto) -> None:
+        self._lista_clases.clear()
+        self._tabla_atributos.setRowCount(0)
+        for clase in especificacion.clases:
+            self._lista_clases.addItem(QListWidgetItem(clase.nombre))
+        if self._lista_clases.count() > 0:
+            self._lista_clases.setCurrentRow(0)
+            self._actualizar_estado_panel_atributos(True)
+            self._renderizar_atributos(especificacion.clases[0])
+        else:
+            self._actualizar_estado_panel_atributos(False)
+        self._emitir_cambio_completitud()
+
     def _clase_seleccionada(self) -> EspecificacionClase | None:
         indice = self._lista_clases.currentRow()
         clases = self._obtener_especificacion_proyecto().clases

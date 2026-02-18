@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtWidgets import QFileDialog, QFormLayout, QHBoxLayout, QLineEdit, QPushButton, QWizardPage
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QWizardPage,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -29,15 +36,23 @@ class PaginaDatosProyecto(QWizardPage):
         boton_ruta = QPushButton("Seleccionar carpeta…")
         boton_ruta.clicked.connect(self._seleccionar_carpeta)
 
+        self.boton_guardar_preset = QPushButton("Guardar preset")
+        self.boton_cargar_preset = QPushButton("Cargar preset")
+
         layout = QFormLayout(self)
         ruta_layout = QHBoxLayout()
         ruta_layout.addWidget(self.campo_ruta)
         ruta_layout.addWidget(boton_ruta)
 
+        acciones_layout = QHBoxLayout()
+        acciones_layout.addWidget(self.boton_guardar_preset)
+        acciones_layout.addWidget(self.boton_cargar_preset)
+
         layout.addRow("Nombre proyecto", self.campo_nombre)
         layout.addRow("Ruta destino", ruta_layout)
         layout.addRow("Descripción", self.campo_descripcion)
         layout.addRow("Versión", self.campo_version)
+        layout.addRow("Presets", acciones_layout)
 
     def _seleccionar_carpeta(self) -> None:
         ruta = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta de destino")

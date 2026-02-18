@@ -6,7 +6,14 @@ from dataclasses import asdict
 import logging
 
 from PySide6.QtCore import QThreadPool
-from PySide6.QtWidgets import QLabel, QMessageBox, QProgressBar, QVBoxLayout, QWizard
+from PySide6.QtWidgets import (
+    QInputDialog,
+    QLabel,
+    QMessageBox,
+    QProgressBar,
+    QVBoxLayout,
+    QWizard,
+)
 
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
@@ -16,8 +23,11 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvpSalida,
 )
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
+from aplicacion.casos_uso.presets import CargarPresetProyecto, GuardarPresetProyecto
 from dominio.modelos import EspecificacionProyecto
+from dominio.preset.preset_proyecto import PresetProyecto
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
+from infraestructura.presets.repositorio_presets_json import RepositorioPresetsJson
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
 from presentacion.wizard.dtos import DatosWizardProyecto
@@ -57,6 +67,8 @@ class WizardGeneradorProyectos(QWizard):
         self,
         controlador: ControladorWizardProyecto | None = None,
         generador_mvp: GenerarProyectoMvp | None = None,
+        guardar_preset: GuardarPresetProyecto | None = None,
+        cargar_preset: CargarPresetProyecto | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("Generador Base Proyectos")
@@ -74,6 +86,9 @@ class WizardGeneradorProyectos(QWizard):
             self._generador_mvp = GenerarProyectoMvp(crear_plan, ejecutar_plan, sistema_archivos)
         else:
             self._generador_mvp = generador_mvp
+
+        self._guardar_preset = guardar_preset or GuardarPresetProyecto(RepositorioPresetsJson())
+        self._cargar_preset = cargar_preset or CargarPresetProyecto(RepositorioPresetsJson())
 
         self.especificacion_proyecto = EspecificacionProyecto(nombre_proyecto="", ruta_destino="")
 
@@ -97,6 +112,8 @@ class WizardGeneradorProyectos(QWizard):
             layout.addWidget(self._etiqueta_estado)
             layout.addWidget(self._barra_progreso)
 
+        self.pagina_datos.boton_guardar_preset.clicked.connect(self._guardar_preset_desde_ui)
+        self.pagina_datos.boton_cargar_preset.clicked.connect(self._cargar_preset_desde_ui)
         self.button(QWizard.FinishButton).clicked.connect(self._al_finalizar)
 
     def _al_finalizar(self) -> None:
@@ -117,6 +134,69 @@ class WizardGeneradorProyectos(QWizard):
         trabajador.senales.error.connect(self._on_generacion_error)
         self._trabajador_activo = trabajador
         self._pool.start(trabajador)
+
+    def _guardar_preset_desde_ui(self) -> None:
+        nombre, aceptado = QInputDialog.getText(self, "Guardar preset", "Nombre del preset")
+        if not aceptado:
+            return
+
+        nombre = nombre.strip()
+        if not nombre:
+            QMessageBox.warning(self, "Guardar preset", "Debes indicar un nombre de preset.")
+            return
+
+        try:
+            self._sincronizar_especificacion_desde_campos()
+            preset = PresetProyecto(
+                nombre=nombre,
+                especificacion=self.especificacion_proyecto,
+                blueprints=BLUEPRINTS_MVP,
+                metadata={"persistencia": self.pagina_persistencia.persistencia_seleccionada()},
+            )
+            ruta = self._guardar_preset.ejecutar(preset)
+            QMessageBox.information(self, "Guardar preset", f"Preset guardado en: {ruta}")
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.error("No se pudo guardar preset: %s", exc)
+            QMessageBox.critical(self, "Guardar preset", str(exc))
+
+    def _cargar_preset_desde_ui(self) -> None:
+        try:
+            nombres = self._cargar_preset._almacen.listar()  # noqa: SLF001
+            if not nombres:
+                QMessageBox.information(self, "Cargar preset", "No hay presets disponibles.")
+                return
+            nombre, aceptado = QInputDialog.getItem(
+                self,
+                "Cargar preset",
+                "Selecciona un preset",
+                nombres,
+                editable=False,
+            )
+            if not aceptado:
+                return
+            preset = self._cargar_preset.ejecutar(nombre)
+            self.aplicar_preset(preset)
+            QMessageBox.information(self, "Cargar preset", f"Preset '{nombre}' cargado.")
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.error("No se pudo cargar preset: %s", exc)
+            QMessageBox.critical(self, "Cargar preset", str(exc))
+
+    def aplicar_preset(self, preset: PresetProyecto) -> None:
+        self.especificacion_proyecto = preset.especificacion
+        self.pagina_datos.campo_nombre.setText(preset.especificacion.nombre_proyecto)
+        self.pagina_datos.campo_ruta.setText(preset.especificacion.ruta_destino)
+        self.pagina_datos.campo_descripcion.setText(preset.especificacion.descripcion or "")
+        self.pagina_datos.campo_version.setText(preset.especificacion.version)
+        persistencia = str(preset.metadata.get("persistencia", "JSON"))
+        self.pagina_persistencia.establecer_persistencia(persistencia)
+        self.pagina_clases.establecer_desde_especificacion(self.especificacion_proyecto)
+        self.pagina_resumen.initializePage()
+
+    def _sincronizar_especificacion_desde_campos(self) -> None:
+        self.especificacion_proyecto.nombre_proyecto = self.pagina_datos.campo_nombre.text().strip()
+        self.especificacion_proyecto.ruta_destino = self.pagina_datos.campo_ruta.text().strip()
+        self.especificacion_proyecto.descripcion = self.pagina_datos.campo_descripcion.text().strip()
+        self.especificacion_proyecto.version = self.pagina_datos.campo_version.text().strip()
 
     def _actualizar_estado(self, texto: str) -> None:
         self._etiqueta_estado.setText(texto)

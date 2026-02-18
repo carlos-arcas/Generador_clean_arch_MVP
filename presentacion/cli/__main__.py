@@ -12,13 +12,13 @@ from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBluep
 from aplicacion.casos_uso.crear_plan_patch_desde_blueprints import CrearPlanPatchDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
-from aplicacion.casos_uso.presets import CargarPreset
+from aplicacion.casos_uso.presets import CargarPresetProyecto
 from aplicacion.errores import ErrorAplicacion, ErrorAuditoria
-from infraestructura.almacen_presets_disco import AlmacenPresetsDisco
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
 from infraestructura.ejecutor_procesos_subprocess import EjecutorProcesosSubprocess
 from infraestructura.logging_config import configurar_logging
 from infraestructura.manifest_en_disco import EscritorManifestSeguro, LectorManifestEnDisco
+from infraestructura.presets.repositorio_presets_json import RepositorioPresetsJson
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
 
@@ -30,12 +30,12 @@ def construir_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="comando", required=True)
 
     generar = subparsers.add_parser("generar", help="Genera un proyecto desde preset")
-    generar.add_argument("--preset", required=True, help="Ruta al preset JSON")
+    generar.add_argument("--preset", required=True, help="Nombre del preset (sin .json)")
     generar.add_argument("--destino", required=True, help="Ruta destino del proyecto")
     generar.add_argument("--patch", action="store_true", help="Fuerza ejecución en modo patch")
 
     validar = subparsers.add_parser("validar-preset", help="Valida un preset")
-    validar.add_argument("--preset", required=True, help="Ruta al preset JSON")
+    validar.add_argument("--preset", required=True, help="Nombre del preset (sin .json)")
 
     auditar = subparsers.add_parser("auditar", help="Audita un proyecto")
     auditar.add_argument("--proyecto", required=True, help="Ruta del proyecto generado")
@@ -44,8 +44,10 @@ def construir_parser() -> argparse.ArgumentParser:
 
 
 def _ejecutar_generar(args: argparse.Namespace) -> int:
-    cargador = CargarPreset(AlmacenPresetsDisco())
-    preset = cargador.ejecutar(args.preset, ruta_destino_forzada=args.destino)
+    cargador = CargarPresetProyecto(RepositorioPresetsJson())
+    preset = cargador.ejecutar(args.preset)
+    preset.especificacion.ruta_destino = args.destino
+
     crear_plan = CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco())
     crear_plan_patch = CrearPlanPatchDesdeBlueprints(
         lector_manifest=LectorManifestEnDisco(),
@@ -66,7 +68,7 @@ def _ejecutar_generar(args: argparse.Namespace) -> int:
     ejecutar_plan.ejecutar(
         plan=plan,
         ruta_destino=args.destino,
-        opciones=preset.opciones,
+        opciones=preset.metadata,
         version_generador=Path("VERSION").read_text(encoding="utf-8").strip(),
         blueprints_usados=[f"{nombre}@1.0.0" for nombre in preset.blueprints],
         generar_manifest=not modo_patch,
@@ -82,7 +84,7 @@ def _ejecutar_generar(args: argparse.Namespace) -> int:
 
 
 def _ejecutar_validar_preset(args: argparse.Namespace) -> int:
-    CargarPreset(AlmacenPresetsDisco()).ejecutar(args.preset)
+    CargarPresetProyecto(RepositorioPresetsJson()).ejecutar(args.preset)
     LOGGER.info("Preset válido: %s", args.preset)
     return 0
 

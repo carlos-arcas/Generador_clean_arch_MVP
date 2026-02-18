@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.3.0] - 2026-02-18
+
+### Añadido
+- Sistema de presets reutilizables (UI + CLI).
+
 ## [1.2.0] - 2026-02-18
 
 ### Añadido

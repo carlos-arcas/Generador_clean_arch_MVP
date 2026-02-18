@@ -479,10 +479,10 @@ class WizardProyecto(QWizard):
     def _construir_preset_actual(self, nombre_preset: str) -> PresetProyecto:
         especificacion = self._actualizar_especificacion_desde_formulario()
         return PresetProyecto(
-            nombre_preset=nombre_preset,
+            nombre=nombre_preset,
             especificacion=especificacion,
             blueprints=self.pagina_blueprints.blueprints_seleccionados(),
-            opciones={"origen": "wizard_pyside6"},
+            metadata={"origen": "wizard_pyside6"},
         )
 
     def _on_guardar_preset(self) -> None:
@@ -491,22 +491,17 @@ class WizardProyecto(QWizard):
             return
         try:
             preset = self._construir_preset_actual(nombre.strip())
-            ruta = self._guardar_preset.ejecutar(preset, incluir_ruta_destino=False)
+            ruta = self._guardar_preset.ejecutar(preset)
             QMessageBox.information(self, "Preset guardado", f"Preset guardado en:\n{ruta}")
         except (ErrorValidacionDominio, ErrorAplicacion, ValueError) as exc:
             QMessageBox.critical(self, "Error al guardar preset", str(exc))
 
     def _on_cargar_preset(self) -> None:
-        ruta, _ = QFileDialog.getOpenFileName(
-            self,
-            "Cargar preset",
-            "configuracion/presets",
-            "JSON (*.json)",
-        )
-        if not ruta:
+        nombre, aceptado = QInputDialog.getText(self, "Cargar preset", "Nombre del preset")
+        if not aceptado or not nombre.strip():
             return
         try:
-            preset = self._cargar_preset.ejecutar(ruta)
+            preset = self._cargar_preset.ejecutar(nombre.strip())
             self.pagina_datos.nombre_proyecto.setText(preset.especificacion.nombre_proyecto)
             self.pagina_datos.descripcion.setText(preset.especificacion.descripcion or "")
             self.pagina_datos.version.setText(preset.especificacion.version)
