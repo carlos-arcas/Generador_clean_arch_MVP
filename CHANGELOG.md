@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] - 2026-02-18
+
+### Añadido
+- Generación segura con validación y MANIFEST
+
+### Corregido
+- Rollback automático en fallo
+
 ## [1.1.0] - 2026-02-18
 
 ### Añadido

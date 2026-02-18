@@ -18,10 +18,11 @@ from infraestructura.sistema_archivos_real import SistemaArchivosReal
 
 
 def test_generar_proyecto_mvp_crea_estructura_minima(tmp_path: Path) -> None:
-    ruta_proyecto = tmp_path / "proyecto_mvp"
+    ruta_base = tmp_path
+    ruta_proyecto = ruta_base / "proyecto_mvp"
     especificacion = EspecificacionProyecto(
         nombre_proyecto="proyecto_mvp",
-        ruta_destino=str(ruta_proyecto),
+        ruta_destino=str(ruta_base),
         descripcion="Proyecto MVP",
         version="1.0.0",
     )
@@ -41,7 +42,7 @@ def test_generar_proyecto_mvp_crea_estructura_minima(tmp_path: Path) -> None:
     salida = caso_uso.ejecutar(
         GenerarProyectoMvpEntrada(
             especificacion_proyecto=especificacion,
-            ruta_destino=str(ruta_proyecto),
+            ruta_destino=str(ruta_base),
             nombre_proyecto="proyecto_mvp",
             blueprints=["base_clean_arch_v1", "crud_json_v1"],
         )

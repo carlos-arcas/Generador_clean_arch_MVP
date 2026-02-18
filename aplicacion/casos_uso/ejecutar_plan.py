@@ -32,9 +32,10 @@ class EjecutarPlan:
         version_generador: str = "0.2.0",
         blueprints_usados: list[str] | None = None,
         generar_manifest: bool = True,
-    ) -> None:
+    ) -> list[str]:
         """Crea directorios, escribe archivos y genera el manifest final."""
         plan.validar_sin_conflictos()
+        archivos_creados: list[str] = []
         for archivo in plan.archivos:
             LOGGER.info("Generando archivo: %s", archivo.ruta_relativa)
             ruta_absoluta = Path(ruta_destino) / archivo.ruta_relativa
@@ -42,6 +43,7 @@ class EjecutarPlan:
             self._sistema_archivos.escribir_texto_atomico(
                 str(ruta_absoluta), archivo.contenido_texto
             )
+            archivos_creados.append(archivo.ruta_relativa)
 
         if self._generador_manifest is not None and generar_manifest:
             self._generador_manifest.ejecutar(
@@ -51,3 +53,5 @@ class EjecutarPlan:
                 version_generador=version_generador,
                 blueprints_usados=blueprints_usados or [],
             )
+
+        return archivos_creados
