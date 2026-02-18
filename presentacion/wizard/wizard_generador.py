@@ -78,21 +78,18 @@ class WizardGeneradorProyectos(QWizard):
         if generar_proyecto is None and generador_mvp is not None:
             generar_proyecto = generador_mvp
 
-        if (
+        dependencias_faltantes = (
             generar_proyecto is None
             or guardar_preset is None
             or cargar_preset is None
             or guardar_credencial is None
             or catalogo_blueprints is None
-        ):
-            from bootstrap.composition_root import crear_contenedor
-
-            contenedor = crear_contenedor()
-            generar_proyecto = generar_proyecto or contenedor.generar_proyecto_mvp
-            guardar_preset = guardar_preset or contenedor.guardar_preset_proyecto
-            cargar_preset = cargar_preset or contenedor.cargar_preset_proyecto
-            guardar_credencial = guardar_credencial or contenedor.guardar_credencial
-            catalogo_blueprints = catalogo_blueprints or contenedor.catalogo_blueprints
+        )
+        if dependencias_faltantes:
+            raise ValueError(
+                "El wizard requiere casos de uso inyectados. "
+                "Construye las dependencias con infraestructura.bootstrap.construir_contenedor_aplicacion()."
+            )
 
         self._controlador = controlador or ControladorWizardProyecto()
         self._pool = QThreadPool.globalInstance()

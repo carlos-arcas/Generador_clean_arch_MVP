@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 
 from aplicacion.errores import ErrorAplicacion, ErrorAuditoria
-from bootstrap.composition_root import configurar_logging, crear_contenedor
+from infraestructura.bootstrap import configurar_logging, construir_contenedor_aplicacion
 
 LOGGER = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     configurar_logging("logs")
     parser = construir_parser()
     args = parser.parse_args(argv)
-    contenedor = crear_contenedor()
+    contenedor = construir_contenedor_aplicacion()
     try:
         if args.comando == "generar":
             return _ejecutar_generar(args, contenedor)

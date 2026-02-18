@@ -13,7 +13,21 @@ QApplication = QtWidgets.QApplication
 
 from aplicacion.dtos.proyecto import DtoAtributo, DtoClase
 from presentacion.wizard.paginas.pagina_resumen import PaginaResumen
+from infraestructura.bootstrap import construir_contenedor_aplicacion
 from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
+
+
+def crear_wizard(**sobrescrituras):
+    contenedor = construir_contenedor_aplicacion()
+    dependencias = {
+        "generar_proyecto": contenedor.generar_proyecto_mvp,
+        "guardar_preset": contenedor.guardar_preset_proyecto,
+        "cargar_preset": contenedor.cargar_preset_proyecto,
+        "guardar_credencial": contenedor.guardar_credencial,
+        "catalogo_blueprints": contenedor.catalogo_blueprints,
+    }
+    dependencias.update(sobrescrituras)
+    return WizardGeneradorProyectos(**dependencias)
 
 
 @pytest.fixture
@@ -25,13 +39,13 @@ def app_qt() -> QApplication:
 
 
 def test_wizard_instancia_sin_errores(app_qt: QApplication) -> None:
-    wizard = WizardGeneradorProyectos()
+    wizard = crear_wizard()
 
     assert wizard.pageIds() == [0, 1, 2, 3]
 
 
 def test_pagina_datos_complete_valida_nombre_y_ruta(app_qt: QApplication) -> None:
-    wizard = WizardGeneradorProyectos()
+    wizard = crear_wizard()
     pagina = wizard.pagina_datos
 
     pagina.campo_nombre.setText("")
@@ -44,7 +58,7 @@ def test_pagina_datos_complete_valida_nombre_y_ruta(app_qt: QApplication) -> Non
 
 
 def test_anadir_clase_evitar_duplicados(app_qt: QApplication) -> None:
-    wizard = WizardGeneradorProyectos()
+    wizard = crear_wizard()
     pagina = wizard.pagina_clases
 
     assert pagina.anadir_clase("Usuario") is True
@@ -53,7 +67,7 @@ def test_anadir_clase_evitar_duplicados(app_qt: QApplication) -> None:
 
 
 def test_persistencia_por_defecto_json(app_qt: QApplication) -> None:
-    wizard = WizardGeneradorProyectos()
+    wizard = crear_wizard()
 
     assert wizard.pagina_persistencia.persistencia_seleccionada() == "JSON"
 

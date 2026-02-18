@@ -11,7 +11,21 @@ QApplication = QtWidgets.QApplication
 
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from dominio.preset.preset_proyecto import PresetProyecto
+from infraestructura.bootstrap import construir_contenedor_aplicacion
 from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
+
+
+def crear_wizard(**sobrescrituras):
+    contenedor = construir_contenedor_aplicacion()
+    dependencias = {
+        "generar_proyecto": contenedor.generar_proyecto_mvp,
+        "guardar_preset": contenedor.guardar_preset_proyecto,
+        "cargar_preset": contenedor.cargar_preset_proyecto,
+        "guardar_credencial": contenedor.guardar_credencial,
+        "catalogo_blueprints": contenedor.catalogo_blueprints,
+    }
+    dependencias.update(sobrescrituras)
+    return WizardGeneradorProyectos(**dependencias)
 
 
 @pytest.fixture
@@ -23,7 +37,7 @@ def app_qt() -> QApplication:
 
 
 def test_wizard_aplica_preset_y_refresca_campos(app_qt: QApplication) -> None:
-    wizard = WizardGeneradorProyectos()
+    wizard = crear_wizard()
     preset = PresetProyecto(
         nombre="api_basica",
         especificacion=EspecificacionProyecto(
