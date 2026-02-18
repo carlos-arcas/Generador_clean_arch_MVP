@@ -29,7 +29,7 @@ from presentacion.wizard.paginas.pagina_clases import PaginaClases
 from presentacion.wizard.paginas.pagina_datos_proyecto import PaginaDatosProyecto
 from presentacion.wizard.paginas.pagina_persistencia import PaginaPersistencia
 from presentacion.wizard.paginas.pagina_resumen import PaginaResumen
-from presentacion.wizard.trabajadores.trabajador_generacion import TrabajadorGeneracionMvp
+from presentacion.trabajadores.trabajador_generacion import TrabajadorGeneracionMvp
 
 LOGGER = logging.getLogger(__name__)
 
