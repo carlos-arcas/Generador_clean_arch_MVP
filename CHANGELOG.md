@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.0] - 2026-02-18
+
+### Añadido
+- Añadido: generación MVP desde wizard (base_clean_arch_v1 + crud_json_v1).
+
 ## [0.9.0] - 2026-02-18
 
 ### Modificado
