@@ -5,7 +5,7 @@ from __future__ import annotations
 from aplicacion.puertos.repositorio_especificacion_proyecto import (
     RepositorioEspecificacionProyecto,
 )
-from dominio.modelos import EspecificacionProyecto
+from dominio.especificacion import EspecificacionProyecto
 
 
 class RepositorioEspecificacionProyectoEnMemoria(RepositorioEspecificacionProyecto):

@@ -7,7 +7,7 @@ import logging
 from aplicacion.puertos.repositorio_especificacion_proyecto import (
     RepositorioEspecificacionProyecto,
 )
-from dominio.modelos import ErrorValidacionDominio, EspecificacionAtributo, EspecificacionClase
+from dominio.especificacion import ErrorValidacionDominio, EspecificacionAtributo, EspecificacionClase
 
 logger = logging.getLogger(__name__)
 

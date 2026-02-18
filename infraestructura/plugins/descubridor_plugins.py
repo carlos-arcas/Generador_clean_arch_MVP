@@ -8,7 +8,8 @@ import logging
 from pathlib import Path
 
 from aplicacion.puertos.blueprint import Blueprint
-from dominio.modelos import ArchivoGenerado, EspecificacionProyecto, PlanGeneracion
+from dominio.especificacion import EspecificacionProyecto
+from dominio.plan_generacion import ArchivoGenerado, PlanGeneracion
 
 LOGGER = logging.getLogger(__name__)
 

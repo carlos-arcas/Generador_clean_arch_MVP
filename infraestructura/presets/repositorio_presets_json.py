@@ -7,7 +7,12 @@ from pathlib import Path
 import tempfile
 
 from aplicacion.puertos.almacen_presets import AlmacenPresets
-from dominio.modelos import ErrorValidacionDominio, EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
+from dominio.especificacion import (
+    ErrorValidacionDominio,
+    EspecificacionAtributo,
+    EspecificacionClase,
+    EspecificacionProyecto,
+)
 from dominio.preset.preset_proyecto import PresetProyecto
 
 

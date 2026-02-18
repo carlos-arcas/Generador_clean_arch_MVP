@@ -5,7 +5,8 @@ from __future__ import annotations
 import textwrap
 
 from blueprints.crud_json_v1.blueprint import CrudJsonBlueprint, NombresClase
-from dominio.modelos import ArchivoGenerado, EspecificacionClase, EspecificacionProyecto, PlanGeneracion
+from dominio.especificacion import EspecificacionClase, EspecificacionProyecto
+from dominio.plan_generacion import ArchivoGenerado, PlanGeneracion
 
 
 class CrudSqliteBlueprint(CrudJsonBlueprint):

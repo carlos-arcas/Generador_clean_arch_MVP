@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dominio.modelos import ArchivoGenerado, EspecificacionProyecto, PlanGeneracion
+from dominio.especificacion import EspecificacionProyecto
+from dominio.plan_generacion import ArchivoGenerado, PlanGeneracion
 
 
 class CrearPlanProyectoBase:

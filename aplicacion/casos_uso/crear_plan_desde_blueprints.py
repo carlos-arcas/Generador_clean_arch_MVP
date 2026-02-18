@@ -6,7 +6,8 @@ import logging
 
 from aplicacion.errores import ErrorBlueprintNoEncontrado, ErrorConflictoArchivos, ErrorValidacion
 from aplicacion.puertos.blueprint import RepositorioBlueprints
-from dominio.modelos import ErrorValidacionDominio, EspecificacionProyecto, PlanGeneracion
+from dominio.especificacion import ErrorValidacionDominio, EspecificacionProyecto
+from dominio.plan_generacion import PlanGeneracion
 from aplicacion.puertos.descubridor_plugins_puerto import DescubridorPluginsPuerto
 
 LOGGER = logging.getLogger(__name__)

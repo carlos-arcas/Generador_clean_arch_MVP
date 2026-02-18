@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from aplicacion.casos_uso.crear_plan_proyecto_base import CrearPlanProyectoBase
 from aplicacion.puertos.blueprint import Blueprint
-from dominio.modelos import EspecificacionProyecto, PlanGeneracion
+from dominio.especificacion import EspecificacionProyecto
+from dominio.plan_generacion import PlanGeneracion
 
 
 class BaseCleanArchBlueprint(Blueprint):

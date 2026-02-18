@@ -16,7 +16,7 @@ from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.puertos.generador_manifest_puerto import GeneradorManifestPuerto
 from aplicacion.puertos.sistema_archivos import SistemaArchivos
 from dominio.excepciones.proyecto_ya_existe_error import ProyectoYaExisteError
-from dominio.modelos import EspecificacionProyecto
+from dominio.especificacion import EspecificacionProyecto
 
 LOGGER = logging.getLogger(__name__)
 

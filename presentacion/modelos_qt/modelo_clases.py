@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
-from dominio.modelos import EspecificacionClase
+from dominio.especificacion import EspecificacionClase
 
 
 class ModeloClases(QAbstractTableModel):
