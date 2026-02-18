@@ -311,11 +311,26 @@ class PaginaBlueprints(QWizardPage):
         self._grupo_persistencia.addButton(self.persistencia_json)
         self._grupo_persistencia.addButton(self.persistencia_sqlite)
 
+        self.informe_csv = QCheckBox("CSV")
+        self.informe_excel = QCheckBox("Excel")
+        self.informe_pdf = QCheckBox("PDF")
+
+        self.informe_excel.toggled.connect(self._forzar_csv_si_hay_informes_avanzados)
+        self.informe_pdf.toggled.connect(self._forzar_csv_si_hay_informes_avanzados)
+
         layout = QVBoxLayout(self)
         layout.addWidget(self.base_clean_arch)
         layout.addWidget(QLabel("Persistencia (selección exclusiva):"))
         layout.addWidget(self.persistencia_json)
         layout.addWidget(self.persistencia_sqlite)
+        layout.addWidget(QLabel("Informes:"))
+        layout.addWidget(self.informe_csv)
+        layout.addWidget(self.informe_excel)
+        layout.addWidget(self.informe_pdf)
+
+    def _forzar_csv_si_hay_informes_avanzados(self) -> None:
+        if self.informe_excel.isChecked() or self.informe_pdf.isChecked():
+            self.informe_csv.setChecked(True)
 
     def blueprints_seleccionados(self) -> list[str]:
         blueprints = ["base_clean_arch"]
@@ -323,6 +338,14 @@ class PaginaBlueprints(QWizardPage):
             blueprints.append("crud_sqlite")
         else:
             blueprints.append("crud_json")
+
+        self._forzar_csv_si_hay_informes_avanzados()
+        if self.informe_csv.isChecked():
+            blueprints.append("export_csv")
+        if self.informe_excel.isChecked():
+            blueprints.append("export_excel")
+        if self.informe_pdf.isChecked():
+            blueprints.append("export_pdf")
         return blueprints
 
 

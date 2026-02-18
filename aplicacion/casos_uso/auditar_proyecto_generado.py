@@ -52,6 +52,7 @@ class AuditarProyectoGenerado:
         errores.extend(self._validar_estructura(base))
         errores.extend(self._validar_imports(base))
         errores.extend(self._validar_logging(base))
+        errores.extend(self._validar_dependencias_informes(base, blueprints))
 
         resultado_pytest = self._ejecutor_procesos.ejecutar(
             comando=["pytest", "--cov=.", "--cov-report=term"],
@@ -101,6 +102,7 @@ class AuditarProyectoGenerado:
         LOGGER.info("Evaluando reglas de arquitectura por imports")
         errores: list[str] = []
         modulos_estandar_restringidos = {"json", "sqlite3"}
+        modulos_exportacion = {"openpyxl", "reportlab"}
         prefijos_externos = {"pydantic", "requests", "sqlalchemy", "fastapi", "pyside6"}
         patron_import = re.compile(r"^\s*import\s+([a-zA-Z0-9_\.]+)", re.MULTILINE)
         patron_from = re.compile(r"^\s*from\s+([a-zA-Z0-9_\.]+)\s+import\s+", re.MULTILINE)
@@ -118,6 +120,10 @@ class AuditarProyectoGenerado:
                 if modulo_raiz == "sqlite3" and relativo.parts[0] != "infraestructura":
                     errores.append(
                         f"Import sqlite3 fuera de infraestructura ({relativo}): {modulo}"
+                    )
+                if modulo_raiz in modulos_exportacion and relativo.parts[0] != "infraestructura":
+                    errores.append(
+                        f"Import {modulo_raiz} fuera de infraestructura ({relativo}): {modulo}"
                     )
 
             if relativo.parts[0] == "dominio":
@@ -145,6 +151,23 @@ class AuditarProyectoGenerado:
                         )
 
         errores.extend(self._detectar_ciclos_basicos(grafo_imports))
+        return errores
+
+    def _validar_dependencias_informes(self, base: Path, blueprints: list[str]) -> list[str]:
+        blueprints_informes = {"export_excel", "export_pdf"}
+        if not any(nombre in blueprints_informes for nombre in blueprints):
+            return []
+
+        ruta_requirements = base / "requirements.txt"
+        if not ruta_requirements.exists():
+            return ["No existe requirements.txt y se solicitaron blueprints de informes."]
+
+        contenido = ruta_requirements.read_text(encoding="utf-8").lower()
+        errores: list[str] = []
+        if "openpyxl" not in contenido:
+            errores.append("requirements.txt no incluye openpyxl para exportación Excel.")
+        if "reportlab" not in contenido:
+            errores.append("requirements.txt no incluye reportlab para exportación PDF.")
         return errores
 
     def _detectar_ciclos_basicos(self, grafo_imports: dict[str, set[str]]) -> list[str]:

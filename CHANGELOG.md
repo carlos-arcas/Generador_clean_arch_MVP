@@ -2,6 +2,19 @@
 
 Todos los cambios importantes de este proyecto se documentan en este archivo.
 
+## [0.9.0] - 2026-02-18
+### Agregado
+- Nuevos blueprints `export_csv_v1`, `export_excel_v1` y `export_pdf_v1` para generación de informes tabulares por entidad.
+- Generación de puertos y casos de uso de informes por formato dentro de aplicación, junto con adaptadores en infraestructura (`csv`, `openpyxl`, `reportlab`).
+- Pruebas de blueprint para exportación y plantillas de pruebas del proyecto generado para CSV/Excel/PDF con `tmp_path`.
+- Nueva sección de "Informes" en UI para activar exportación CSV/Excel/PDF.
+
+### Cambiado
+- La selección de informes en UI fuerza `CSV` cuando se activa `Excel` o `PDF`.
+- El auditor valida imports de `openpyxl`/`reportlab` fuera de infraestructura y revisa dependencias de exportación en `requirements.txt`.
+- `CrearPlanProyectoBase` ahora genera `requirements.txt` base con dependencias de pruebas y exportación.
+- Versión del generador actualizada a `0.9.0`.
+
 ## [0.8.0] - 2026-02-18
 ### Agregado
 - Modo PATCH incremental para proyectos existentes: lectura de `manifest.json`, detección de clases ya generadas y generación de plan parcial solo para clases nuevas.

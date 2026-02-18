@@ -111,3 +111,14 @@ Este flujo evita bloqueo de interfaz y mantiene dependencia hacia adentro: la UI
 5. `EjecutarPlan` escribe solo archivos nuevos (sin regenerar manifest completo).
 6. `ActualizarManifestPatch` calcula hash de archivos nuevos, anexa entradas al manifest y persiste con escritura atómica.
 7. Se ejecuta auditor avanzado y se regenera `docs/informe_auditoria.md`.
+
+## Informes/exportación como blueprints (v0.9.0)
+- Se agregan tres blueprints independientes: `export_csv_v1`, `export_excel_v1` y `export_pdf_v1`.
+- **Aplicación** define puertos de exportación tabular por formato (`ExportadorTabularCsv`, `ExportadorTabularExcel`, `ExportadorTabularPdf`) y casos de uso `GenerarInforme<Entidad><Formato>` bajo `aplicacion/casos_uso/informes`.
+- **Infraestructura** implementa adaptadores concretos:
+  - `infraestructura/informes/csv/exportador_csv.py` (coma, UTF-8),
+  - `infraestructura/informes/excel/exportador_excel_openpyxl.py` (una hoja simple),
+  - `infraestructura/informes/pdf/exportador_pdf_reportlab.py` (título + tabla simple + paginación mínima).
+- **Dominio** no incorpora dependencias ni conocimiento de exportación.
+- El wizard añade sección **Informes** con checkboxes CSV/Excel/PDF; al activar Excel o PDF se fuerza CSV para mantener salida tabular base.
+- La auditoría extiende reglas de imports para restringir `openpyxl` y `reportlab` a infraestructura y valida dependencias en `requirements.txt` cuando se usan blueprints de informes.

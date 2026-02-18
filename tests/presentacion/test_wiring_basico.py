@@ -92,3 +92,20 @@ def test_pagina_blueprints_persistencia_exclusiva() -> None:
 
     assert pagina.blueprints_seleccionados() == ["base_clean_arch", "crud_sqlite"]
     assert pagina.persistencia_json.isChecked() is False
+
+
+def test_pagina_blueprints_informes_fuerza_csv() -> None:
+    _app()
+    pagina = PaginaBlueprints()
+
+    pagina.informe_excel.setChecked(True)
+
+    assert pagina.informe_csv.isChecked() is True
+    assert "export_csv" in pagina.blueprints_seleccionados()
+    assert "export_excel" in pagina.blueprints_seleccionados()
+
+    pagina.informe_pdf.setChecked(True)
+
+    seleccion = pagina.blueprints_seleccionados()
+    assert "export_pdf" in seleccion
+    assert "export_csv" in seleccion
