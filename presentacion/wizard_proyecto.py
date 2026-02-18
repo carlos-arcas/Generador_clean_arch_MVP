@@ -8,7 +8,9 @@ import traceback
 
 from PySide6.QtCore import QThreadPool
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
+    QRadioButton,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -106,7 +108,7 @@ class PaginaDatosProyecto(QWizardPage):
         self.nombre_proyecto = QLineEdit("proyecto_demo")
         self.ruta_destino = QLineEdit("salida/proyecto_demo")
         self.descripcion = QLineEdit("Proyecto generado con wizard PySide6")
-        self.version = QLineEdit("0.5.0")
+        self.version = QLineEdit("0.7.0")
 
         boton_ruta = QPushButton("Seleccionar carpeta...")
         boton_ruta.clicked.connect(self._seleccionar_directorio)
@@ -295,16 +297,27 @@ class PaginaBlueprints(QWizardPage):
         self.base_clean_arch.setChecked(True)
         self.base_clean_arch.setEnabled(False)
 
-        self.crud_json = QCheckBox("crud_json")
-        self.crud_json.setChecked(True)
+        self._grupo_persistencia = QButtonGroup(self)
+        self._grupo_persistencia.setExclusive(True)
+
+        self.persistencia_json = QRadioButton("JSON")
+        self.persistencia_sqlite = QRadioButton("SQLite")
+        self.persistencia_json.setChecked(True)
+
+        self._grupo_persistencia.addButton(self.persistencia_json)
+        self._grupo_persistencia.addButton(self.persistencia_sqlite)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.base_clean_arch)
-        layout.addWidget(self.crud_json)
+        layout.addWidget(QLabel("Persistencia (selección exclusiva):"))
+        layout.addWidget(self.persistencia_json)
+        layout.addWidget(self.persistencia_sqlite)
 
     def blueprints_seleccionados(self) -> list[str]:
         blueprints = ["base_clean_arch"]
-        if self.crud_json.isChecked():
+        if self.persistencia_sqlite.isChecked():
+            blueprints.append("crud_sqlite")
+        else:
             blueprints.append("crud_json")
         return blueprints
 

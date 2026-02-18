@@ -113,6 +113,13 @@ class AuditarProyectoGenerado:
             imports = set(patron_import.findall(contenido)) | set(patron_from.findall(contenido))
             grafo_imports[modulo_actual] = imports
 
+            for modulo in imports:
+                modulo_raiz = modulo.lower().split(".")[0]
+                if modulo_raiz == "sqlite3" and relativo.parts[0] != "infraestructura":
+                    errores.append(
+                        f"Import sqlite3 fuera de infraestructura ({relativo}): {modulo}"
+                    )
+
             if relativo.parts[0] == "dominio":
                 for modulo in imports:
                     modulo_bajo = modulo.lower()

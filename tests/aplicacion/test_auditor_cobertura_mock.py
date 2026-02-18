@@ -16,7 +16,7 @@ class EjecutorMock(EjecutorProcesos):
 def _crear_estructura_valida(base: Path) -> None:
     for carpeta in ["dominio", "aplicacion", "infraestructura", "presentacion", "tests", "scripts", "logs", "docs"]:
         (base / carpeta).mkdir(parents=True)
-    (base / "VERSION").write_text("0.6.0", encoding="utf-8")
+    (base / "VERSION").write_text("0.7.0", encoding="utf-8")
     (base / "CHANGELOG.md").write_text("# CHANGELOG", encoding="utf-8")
     (base / "infraestructura" / "logging_config.py").write_text("def configurar_logging(): pass", encoding="utf-8")
     (base / "logs" / "seguimiento.log").write_text("", encoding="utf-8")

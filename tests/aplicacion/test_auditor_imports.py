@@ -12,7 +12,7 @@ class EjecutorFalso(EjecutorProcesos):
 def _crear_base(base: Path) -> None:
     for carpeta in ["dominio", "aplicacion", "infraestructura", "presentacion", "tests", "scripts", "logs", "docs"]:
         (base / carpeta).mkdir(parents=True)
-    (base / "VERSION").write_text("0.6.0", encoding="utf-8")
+    (base / "VERSION").write_text("0.7.0", encoding="utf-8")
     (base / "CHANGELOG.md").write_text("# CHANGELOG", encoding="utf-8")
     (base / "infraestructura" / "logging_config.py").write_text("def configurar_logging(): pass", encoding="utf-8")
     (base / "logs" / "seguimiento.log").write_text("", encoding="utf-8")
@@ -38,3 +38,22 @@ def test_auditor_detecta_import_circular_basico(tmp_path: Path) -> None:
 
     assert resultado.valido is False
     assert any("Import circular detectado" in error for error in resultado.lista_errores)
+
+
+def test_auditor_rechaza_sqlite3_fuera_de_infraestructura(tmp_path: Path) -> None:
+    _crear_base(tmp_path)
+    (tmp_path / "aplicacion" / "caso.py").write_text("import sqlite3\n", encoding="utf-8")
+
+    resultado = AuditarProyectoGenerado(EjecutorFalso()).ejecutar(str(tmp_path))
+
+    assert resultado.valido is False
+    assert any("sqlite3 fuera de infraestructura" in error for error in resultado.lista_errores)
+
+
+def test_auditor_permite_sqlite3_en_infraestructura(tmp_path: Path) -> None:
+    _crear_base(tmp_path)
+    (tmp_path / "infraestructura" / "repo.py").write_text("import sqlite3\n", encoding="utf-8")
+
+    resultado = AuditarProyectoGenerado(EjecutorFalso()).ejecutar(str(tmp_path))
+
+    assert resultado.valido is True
