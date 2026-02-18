@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+from pathlib import Path
 import traceback
 
 from PySide6.QtCore import QThreadPool
@@ -32,7 +33,9 @@ from PySide6.QtWidgets import (
 )
 
 from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.casos_uso.actualizar_manifest_patch import ActualizarManifestPatch
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
+from aplicacion.casos_uso.crear_plan_patch_desde_blueprints import CrearPlanPatchDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
 from aplicacion.casos_uso.gestion_clases import (
@@ -47,6 +50,7 @@ from aplicacion.casos_uso.gestion_clases import (
 from dominio.modelos import ErrorValidacionDominio, EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from infraestructura.calculadora_hash_real import CalculadoraHashReal
 from infraestructura.ejecutor_procesos_subprocess import EjecutorProcesosSubprocess
+from infraestructura.manifest_en_disco import EscritorManifestSeguro, LectorManifestEnDisco
 from infraestructura.repositorio_blueprints_en_disco import RepositorioBlueprintsEnDisco
 from infraestructura.repositorio_especificacion_proyecto_en_memoria import RepositorioEspecificacionProyectoEnMemoria
 from infraestructura.sistema_archivos_real import SistemaArchivosReal
@@ -108,7 +112,7 @@ class PaginaDatosProyecto(QWizardPage):
         self.nombre_proyecto = QLineEdit("proyecto_demo")
         self.ruta_destino = QLineEdit("salida/proyecto_demo")
         self.descripcion = QLineEdit("Proyecto generado con wizard PySide6")
-        self.version = QLineEdit("0.7.0")
+        self.version = QLineEdit("0.8.0")
 
         boton_ruta = QPushButton("Seleccionar carpeta...")
         boton_ruta.clicked.connect(self._seleccionar_directorio)
@@ -364,6 +368,7 @@ class WizardProyecto(QWizard):
         self.resize(1000, 680)
 
         self._version_generador = version_generador
+        self._lector_manifest = LectorManifestEnDisco()
         self._thread_pool = QThreadPool.globalInstance()
         self._repositorio_estado = RepositorioEspecificacionProyectoEnMemoria(
             EspecificacionProyecto(
@@ -387,15 +392,30 @@ class WizardProyecto(QWizard):
     def construir_resumen(self) -> str:
         especificacion = self._actualizar_especificacion_desde_formulario()
         blueprints = self.pagina_blueprints.blueprints_seleccionados()
+        clases_existentes: list[str] = []
+        modo_patch = False
+        ruta_manifest = Path(especificacion.ruta_destino) / "manifest.json"
+        if ruta_manifest.exists():
+            modo_patch = True
+            manifest = self._lector_manifest.leer(especificacion.ruta_destino)
+            clases_existentes = manifest.obtener_clases_generadas()
         clases = [f"- {clase.nombre} ({len(clase.atributos)} atributos)" for clase in especificacion.clases]
         clases_txt = "\n".join(clases) if clases else "- Sin clases"
+        clases_nuevas = [clase.nombre for clase in especificacion.clases if clase.nombre not in clases_existentes]
+        clases_bloqueadas = [clase.nombre for clase in especificacion.clases if clase.nombre in clases_existentes]
+        bloqueadas_txt = ", ".join(clases_bloqueadas) if clases_bloqueadas else "-"
+        nuevas_txt = ", ".join(clases_nuevas) if clases_nuevas else "-"
+        aviso_patch = "\nProyecto existente detectado. Se aplicará modo PATCH." if modo_patch else ""
         return (
             f"Proyecto: {especificacion.nombre_proyecto}\n"
             f"Ruta: {especificacion.ruta_destino}\n"
             f"Descripción: {especificacion.descripcion or '-'}\n"
             f"Versión: {especificacion.version}\n"
             f"Blueprints: {', '.join(blueprints)}\n"
-            f"Clases:\n{clases_txt}"
+            f"Clases:\n{clases_txt}\n"
+            f"Clases nuevas a añadir: {nuevas_txt}\n"
+            f"Clases ya existentes (bloqueadas): {bloqueadas_txt}"
+            f"{aviso_patch}"
         )
 
     def _actualizar_especificacion_desde_formulario(self) -> EspecificacionProyecto:
@@ -429,9 +449,18 @@ class WizardProyecto(QWizard):
             especificacion=especificacion,
             blueprints=blueprints,
             crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco()),
+            crear_plan_patch_desde_blueprints=CrearPlanPatchDesdeBlueprints(
+                lector_manifest=self._lector_manifest,
+                crear_plan_desde_blueprints=CrearPlanDesdeBlueprints(RepositorioBlueprintsEnDisco()),
+            ),
             ejecutar_plan=EjecutarPlan(
                 sistema_archivos=SistemaArchivosReal(),
                 generador_manifest=GenerarManifest(CalculadoraHashReal()),
+            ),
+            actualizar_manifest_patch=ActualizarManifestPatch(
+                lector_manifest=self._lector_manifest,
+                escritor_manifest=EscritorManifestSeguro(),
+                calculadora_hash=CalculadoraHashReal(),
             ),
             auditor=AuditarProyectoGenerado(EjecutorProcesosSubprocess()),
             version_generador=self._version_generador,

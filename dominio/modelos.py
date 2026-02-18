@@ -252,3 +252,15 @@ class ManifestProyecto:
             raise ErrorValidacionDominio(
                 f"El manifest contiene rutas duplicadas: {sorted(duplicadas)}"
             )
+
+    def obtener_clases_generadas(self) -> list[str]:
+        """Infiera clases generadas recorriendo rutas de entidades en manifest."""
+        clases: set[str] = set()
+        for entrada in self.archivos:
+            if not entrada.ruta_relativa.startswith("dominio/entidades/"):
+                continue
+            if not entrada.ruta_relativa.endswith(".py"):
+                continue
+            nombre_archivo = entrada.ruta_relativa.rsplit("/", maxsplit=1)[-1].removesuffix(".py")
+            clases.add("".join(segmento.capitalize() for segmento in nombre_archivo.split("_")))
+        return sorted(clases)

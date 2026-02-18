@@ -62,3 +62,21 @@ El caso de uso `AuditarProyectoGenerado` ahora ejecuta validaciones avanzadas de
   - mockea el puerto `EjecutorProcesos` para escenarios de cobertura 90% (aprobado) y 70% (rechazado).
 
 > Nota: en pruebas del generador no se ejecuta `pytest` real del proyecto generado; se usa mock del puerto de procesos para mantener pruebas rápidas y deterministas.
+
+## Pruebas de modo PATCH (v0.8.0)
+Se incorporan pruebas enfocadas en actualización incremental de proyecto existente:
+
+- `tests/aplicacion/test_patch_nueva_clase.py`
+  - manifiesto inicial con `Cliente`;
+  - se solicita agregar `Producto`;
+  - el plan resultante incluye solo archivos de `Producto`.
+- `tests/aplicacion/test_patch_clase_existente_error.py`
+  - manifiesto inicial con `Cliente`;
+  - se intenta agregar `Cliente` nuevamente;
+  - se valida error controlado por clase ya existente.
+- `tests/aplicacion/test_actualizar_manifest_patch.py`
+  - verifica que el manifest conserva entradas antiguas;
+  - agrega únicamente nuevas entradas con hash recalculado;
+  - valida actualización de timestamp sin mutar hashes previos.
+
+Estas pruebas usan `tmp_path` y no ejecutan procesos reales externos.

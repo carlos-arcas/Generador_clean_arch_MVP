@@ -77,3 +77,21 @@ Los repositorios SQLite abren conexión en cada operación CRUD usando context m
 
 ## Intercambiabilidad real por puertos de aplicación
 JSON y SQLite implementan el mismo puerto `Repositorio<Entidad>`. Los casos de uso y entidades se conservan idénticos entre blueprints de persistencia. Esto permite cambiar de adaptador sin modificar dominio ni aplicación, cumpliendo inversión de dependencias de Clean Architecture.
+
+## No sobrescritura por defecto en PATCH (v0.8.0)
+Se adopta política estricta de no sobrescritura: si una clase ya existe en manifest o algún archivo objetivo ya existe en disco, la operación PATCH se aborta de forma controlada. Motivos:
+- proteger proyectos ya generados de cambios destructivos,
+- evitar divergencia silenciosa entre código real y manifest,
+- mantener trazabilidad de cambios incrementales.
+
+## Actualización incremental de manifest
+En PATCH no se regenera el manifest completo. Se anexan exclusivamente nuevas entradas (`ruta_relativa + hash_sha256`) y se conserva intacto el histórico previo. Motivos:
+- minimizar riesgo de corrupción de metadata existente,
+- conservar hashes originales como evidencia de integridad,
+- simplificar auditoría de cambios incrementales.
+
+## Escritura atómica obligatoria de manifest
+La persistencia de `manifest.json` usa archivo temporal + replace atómico. Motivos:
+- evitar archivos truncados ante fallos intermedios,
+- asegurar estado consistente incluso con cierres inesperados,
+- mantener confiabilidad del punto de control de PATCH.

@@ -31,6 +31,7 @@ class EjecutarPlan:
         opciones: dict[str, Any] | None = None,
         version_generador: str = "0.2.0",
         blueprints_usados: list[str] | None = None,
+        generar_manifest: bool = True,
     ) -> None:
         """Crea directorios, escribe archivos y genera el manifest final."""
         plan.validar_sin_conflictos()
@@ -42,7 +43,7 @@ class EjecutarPlan:
                 str(ruta_absoluta), archivo.contenido_texto
             )
 
-        if self._generador_manifest is not None:
+        if self._generador_manifest is not None and generar_manifest:
             self._generador_manifest.ejecutar(
                 plan=plan,
                 ruta_destino=ruta_destino,
