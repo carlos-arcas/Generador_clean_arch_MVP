@@ -211,11 +211,29 @@ class WizardGeneradorProyectos(QWizard):
     def _on_generacion_exitosa(self, salida: GenerarProyectoMvpSalida) -> None:
         self._cambiar_estado_generando(False, "")
         LOGGER.info(
-            "Generación completada en wizard: ruta=%s archivos=%s",
+            "Generación completada en wizard: ruta=%s archivos=%s valido=%s errores=%s warnings=%s",
             salida.ruta_generada,
             salida.archivos_generados,
+            salida.valido,
+            len(salida.errores),
+            len(salida.warnings),
         )
-        QMessageBox.information(self, "Generación completada", "Proyecto generado correctamente")
+        mensaje = (
+            "Proyecto generado correctamente.\n"
+            "Auditoría:\n"
+            f"   Errores: {len(salida.errores)}\n"
+            f"   Warnings: {len(salida.warnings)}"
+        )
+        if salida.valido:
+            QMessageBox.information(self, "Generación completada", mensaje)
+            return
+
+        detalle = "\n".join(salida.errores) if salida.errores else "Sin detalles adicionales"
+        QMessageBox.warning(
+            self,
+            "Generación completada con observaciones",
+            f"{mensaje}\n\nSe detectaron errores críticos de auditoría:\n{detalle}",
+        )
 
     def _on_generacion_error(self, mensaje: str, detalle: str) -> None:
         self._cambiar_estado_generando(False, "")

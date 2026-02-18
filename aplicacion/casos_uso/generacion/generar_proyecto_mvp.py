@@ -7,6 +7,10 @@ import logging
 from pathlib import Path
 import shutil
 
+from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import (
+    AuditarProyectoGenerado,
+    ResultadoAuditoria,
+)
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.puertos.sistema_archivos import SistemaArchivos
@@ -47,6 +51,8 @@ class GenerarProyectoMvpSalida:
     archivos_generados: int
     valido: bool
     errores: list[str]
+    warnings: list[str]
+    auditoria: ResultadoAuditoria | None = None
 
 
 class GenerarProyectoMvp:
@@ -58,11 +64,13 @@ class GenerarProyectoMvp:
         ejecutar_plan: EjecutarPlan,
         sistema_archivos: SistemaArchivos,
         generador_manifest: GeneradorManifest | None = None,
+        auditor: AuditarProyectoGenerado | None = None,
     ) -> None:
         self._crear_plan = crear_plan_desde_blueprints
         self._ejecutar_plan = ejecutar_plan
         self._sistema_archivos = sistema_archivos
         self._generador_manifest = generador_manifest or GeneradorManifest()
+        self._auditor = auditor or AuditarProyectoGenerado()
 
     def ejecutar(self, entrada: GenerarProyectoMvpEntrada) -> GenerarProyectoMvpSalida:
         """Genera el proyecto final en disco a partir de los blueprints MVP."""
@@ -115,11 +123,20 @@ class GenerarProyectoMvp:
                 archivos_generados=archivos_creados,
             )
 
+            resultado_auditoria = self._auditor.auditar(str(ruta_proyecto))
+            LOGGER.info(
+                "Auditoría post-generación: valido=%s errores=%s warnings=%s",
+                resultado_auditoria.valido,
+                len(resultado_auditoria.errores),
+                len(resultado_auditoria.warnings),
+            )
             salida = GenerarProyectoMvpSalida(
                 ruta_generada=str(ruta_proyecto),
                 archivos_generados=len(archivos_creados),
-                valido=True,
-                errores=[],
+                valido=resultado_auditoria.valido,
+                errores=resultado_auditoria.errores,
+                warnings=resultado_auditoria.warnings,
+                auditoria=resultado_auditoria,
             )
             LOGGER.info(
                 "Generación MVP finalizada correctamente: ruta='%s' archivos=%s",
@@ -139,6 +156,7 @@ class GenerarProyectoMvp:
                 archivos_generados=0,
                 valido=False,
                 errores=[str(exc)],
+                warnings=[],
             )
 
     def _validar_ruta_destino(self, ruta_proyecto: Path) -> None:
