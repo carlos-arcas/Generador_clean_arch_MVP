@@ -1,13 +1,19 @@
 # Decisiones técnicas
 
-## Separación en CrearPlan y EjecutarPlan
-Se separa la planificación de la ejecución para:
-- facilitar pruebas unitarias sin IO real,
-- permitir validación previa del plan,
-- habilitar futuras estrategias de salida (preview, dry-run, exportación).
+## Sistema de plugins mediante blueprints
+Se introduce un contrato `Blueprint` con `RepositorioBlueprints` para desacoplar la construcción del plan de generación del flujo principal. Esto permite evolución incremental: se pueden sumar blueprints nuevos sin alterar los casos de uso centrales.
 
-## Escritura atómica
-Se usa escritura temporal + `replace` para reducir riesgo de corrupción en fallos intermedios. De esta manera el archivo destino se actualiza de forma íntegra.
+## Plan compuesto y validación de conflictos
+`PlanGeneracion` ahora permite `fusionar` y validar conflictos de rutas. Esta decisión evita sobreescrituras silenciosas y convierte errores de diseño de blueprint en fallos explícitos de dominio.
 
-## Uso de puertos
-El puerto `SistemaArchivos` desacopla casos de uso de implementación concreta. Esto mejora testabilidad y mantiene la regla de dependencia hacia adentro.
+## Manifest con hashes SHA256
+Se agrega `manifest.json` con metadata de trazabilidad (versión del generador, blueprints usados, opciones, timestamp y hashes). Motivos:
+- auditoría posterior,
+- detección de cambios de contenido,
+- soporte futuro para verificación de integridad.
+
+## Auditoría mínima automatizada
+`AuditarProyectoGenerado` valida artefactos obligatorios en disco tras la generación. Con esto el sistema puede dar una señal binaria rápida (`valido`) más lista de errores accionables, sin mezclar lógica de UI ni `print`.
+
+## Uso de puertos para IO y hashing
+La escritura de archivos (`SistemaArchivos`) y el hash (`CalculadoraHash`) se modelan como puertos para mantener testabilidad y cumplimiento de dependencia hacia adentro.

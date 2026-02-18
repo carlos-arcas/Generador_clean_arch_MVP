@@ -40,3 +40,27 @@ def test_sistema_archivos_real_escribe_archivo_atomico(tmp_path: Path) -> None:
 
     assert ruta.exists()
     assert ruta.read_text(encoding="utf-8") == "hola"
+
+
+class GeneradorManifestDoble:
+    def __init__(self) -> None:
+        self.llamadas: list[dict[str, object]] = []
+
+    def ejecutar(self, **kwargs: object) -> None:
+        self.llamadas.append(kwargs)
+
+
+def test_ejecutar_plan_dispara_generacion_manifest(tmp_path: Path) -> None:
+    plan = PlanGeneracion(archivos=[ArchivoGenerado("README.md", "contenido")])
+    doble_fs = SistemaArchivosDoble()
+    doble_manifest = GeneradorManifestDoble()
+
+    EjecutarPlan(doble_fs, doble_manifest).ejecutar(
+        plan,
+        str(tmp_path),
+        opciones={"modo": "prueba"},
+        version_generador="0.2.0",
+        blueprints_usados=["base_clean_arch@1.0.0"],
+    )
+
+    assert len(doble_manifest.llamadas) == 1

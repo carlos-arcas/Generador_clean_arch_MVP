@@ -30,6 +30,12 @@ class CrearPlanProyectoBase:
                 ArchivoGenerado("README.md", contenido_readme),
                 ArchivoGenerado("VERSION", especificacion.version),
                 ArchivoGenerado("CHANGELOG.md", contenido_changelog),
+                ArchivoGenerado("logs/.gitkeep", ""),
+                ArchivoGenerado("scripts/lanzar_app.bat", "@echo off\npython -m presentacion\n"),
+                ArchivoGenerado(
+                    "scripts/ejecutar_tests.bat",
+                    "@echo off\npytest --cov=. --cov-report=term-missing --cov-fail-under=85\n",
+                ),
             ]
         )
         plan.comprobar_duplicados()
