@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.0] - 2026-02-18
+
+### Refactorizado
+- Introducido composition root para desacoplar presentación de infraestructura.
+
 ## [1.6.0] - 2026-02-18
 
 ### Añadido
