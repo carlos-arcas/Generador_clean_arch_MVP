@@ -1,46 +1,3 @@
-# Auditoría runtime v6 con evidencias reproducibles
-
-## Alcance verificado por tests
-
-| Test | Objetivo verificable |
-|---|---|
-| `tests/integracion/test_generacion_completa.py::test_generacion_completa_publica_manifest_y_escribe_logs_sin_print` | Verificar generación E2E, publicación de `MANIFEST.json`, logging en `tmp_path/logs` y ausencia de `print` (stdout/stderr vacíos). |
-| `tests/integracion/test_wizard_orquestador.py::test_wizard_orquestador_preserva_dto_y_no_imprime` | Verificar integración wizard→orquestador, inmutabilidad del DTO de entrada y ausencia de salida por `print`. |
-| `tests/integracion/test_auditoria_completa.py::test_auditoria_detecta_violacion_real_de_capa` | Verificar que la auditoría detecta violación real dominio→infraestructura. |
-| `tests/integracion/test_fallos_hostiles.py::test_fallos_hostiles_hacen_rollback_sin_huerfanos_y_con_stacktrace[permiso_denegado-<lambda>]` | Forzar `PermissionError` en preparación de estructura; validar rollback sin huérfanos, stacktrace en `crashes.log` y registro INFO de caso de uso. |
-| `tests/integracion/test_fallos_hostiles.py::test_fallos_hostiles_hacen_rollback_sin_huerfanos_y_con_stacktrace[manifest_error-<lambda>]` | Forzar `OSError` en publicación de manifest; validar rollback sin huérfanos, stacktrace en `crashes.log` y registro INFO de caso de uso. |
-| `tests/integracion/test_fallos_hostiles.py::test_fallo_hostil_sobre_directorio_preexistente_no_deja_huerfanos` | Verificar rollback explícito sobre destino preexistente vacío: estado final permitido (no existe/vacío/igual previo) y sin huérfanos. |
-| `tests/integracion/test_concurrencia_basica.py::test_concurrencia_basica_dos_generaciones_no_comparten_estado` | Verificar concurrencia básica en 2 hilos con rutas independientes y sin contaminación de estado. |
-| `tests/snapshots/test_blueprints_snapshot.py::test_snapshot_base_crud_json_csv` | Verificar snapshot contra golden con normalización anti-flaky (rutas/timestamps/UUID). |
-| `tests/snapshots/test_blueprints_snapshot.py::test_snapshot_base_sqlite_excel_pdf` | Verificar snapshot contra golden con normalización anti-flaky (rutas/timestamps/UUID). |
-
-## Comandos ejecutados (exactos)
-
-```bash
-pytest -q tests/integracion/test_generacion_completa.py tests/integracion/test_wizard_orquestador.py tests/integracion/test_auditoria_completa.py tests/integracion/test_fallos_hostiles.py tests/integracion/test_concurrencia_basica.py tests/snapshots/test_blueprints_snapshot.py
-pytest -q --maxfail=1
-pytest --cov=. --cov-report=term-missing --cov-fail-under=85
-```
-
-## Salida real: `pytest -q --maxfail=1`
-
-```text
-........................................................................ [ 28%]
-........................................................................ [ 57%]
-........................................................................ [ 86%]
-.................................                                        [100%]
-=============================== warnings summary ===============================
-tests/calidad/test_auditoria_diseno_cohesion_v4.py::test_auditoria_diseno_cohesion_v4_bloquea_regresiones_criticas
-  /root/.pyenv/versions/3.12.12/lib/python3.12/site-packages/_pytest/python.py:159: UserWarning: Auditoría v4 reporta 5 hallazgos MEDIO (no bloqueante).
-    result = testfunction(**testargs)
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-249 passed, 15 skipped, 1 warning in 3.07s
-```
-
-## Salida real: `pytest --cov=. --cov-report=term-missing --cov-fail-under=85`
-
-```text
 ============================= test session starts ==============================
 platform linux -- Python 3.12.12, pytest-8.3.3, pluggy-1.6.0
 rootdir: /workspace/Generador_clean_arch_MVP
@@ -287,16 +244,3 @@ TOTAL                                                                           
 
 Required test coverage of 85% reached. Total coverage: 89.88%
 ================== 249 passed, 15 skipped, 1 warning in 6.66s ==================
-```
-
-## Escenarios hostiles (evidencia de test)
-
-| Escenario hostil | Cómo se fuerza | Qué excepción | Qué rollback se verifica | Qué log se verifica |
-|---|---|---|---|---|
-| Permisos denegados al crear estructura | Stub `_SistemaArchivosConPermisoDenegado.asegurar_directorio` lanza `PermissionError`. | `ErrorGeneracionProyecto` (encadenado desde `PermissionError`). | Se verifica condición explícita: directorio final inexistente, vacío o igual al estado previo; además `huerfanos = estado_post - estado_prev` debe ser vacío. | `seguimiento.log` contiene `INFO` + `caso_uso=GenerarProyectoMvp`; `crashes.log` contiene `Traceback`. |
-| Error de publicación de manifest | Stub `_ManifestConError.generar` lanza `OSError("disco lleno")`. | `ErrorGeneracionProyecto` (encadenado desde `OSError`). | Misma verificación explícita de rollback y huérfanos. | Misma verificación de `seguimiento.log` y `crashes.log`. |
-| Fallo sobre destino preexistente vacío | Se crea carpeta vacía previa y se fuerza fallo de manifest. | `ErrorGeneracionProyecto`. | Se acepta sólo estado final permitido (inexistente/vacío/igual previo) y ausencia total de huérfanos. | Cobertura de logs en el test hostil parametrizado. |
-
-## Límite de afirmaciones
-
-Las afirmaciones de este documento se limitan a lo demostrado por los tests listados y por las salidas reales pegadas arriba. No se incluyen conclusiones no cubiertas por evidencia ejecutada en esta corrida.

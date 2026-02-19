@@ -99,10 +99,14 @@ class _ReglaDependenciasInformes(ReglaValidacion):
         if not ruta.exists():
             return ResultadoValidacion(False, "No existe requirements.txt y se solicitaron blueprints de informes.", "ERROR")
         contenido = ruta.read_text(encoding="utf-8").lower()
+        faltantes: list[str] = []
         if "openpyxl" not in contenido:
-            return ResultadoValidacion(False, "requirements.txt no incluye openpyxl para exportación Excel.", "ERROR")
+            faltantes.append("openpyxl")
         if "reportlab" not in contenido:
-            return ResultadoValidacion(False, "requirements.txt no incluye reportlab para exportación PDF.", "ERROR")
+            faltantes.append("reportlab")
+        if faltantes:
+            dependencias = ", ".join(faltantes)
+            return ResultadoValidacion(False, f"requirements.txt no incluye dependencias requeridas para informes: {dependencias}.", "ERROR")
         return None
 
 
@@ -215,6 +219,7 @@ class AuditarProyectoGenerado:
         return _EstadoAuditoria(errores=[], blueprints=blueprints_usados or [])
 
     def _validar_reglas_base(self, base: Path, estado: _EstadoAuditoria) -> None:
+        self._motor_validacion = MotorValidacion(self._crear_reglas_base())
         contexto = _ContextoReglasAuditoria(
             base=base,
             blueprints=estado.blueprints,

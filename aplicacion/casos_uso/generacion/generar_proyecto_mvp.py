@@ -90,6 +90,7 @@ class GenerarProyectoMvp:
 
         carpeta_creada_en_ejecucion = False
         carpeta_existia_antes = ruta_proyecto.exists()
+        carpeta_existia_vacia = carpeta_existia_antes and not any(ruta_proyecto.iterdir())
         try:
             carpeta_creada_en_ejecucion = self._preparador_estructura.preparar(ruta_proyecto)
             resultado_plan = self._ejecutor_plan.ejecutar(
@@ -123,5 +124,8 @@ class GenerarProyectoMvp:
             OSError,
             ValueError,
         ) as exc:
-            self._rollback.ejecutar(ruta_proyecto, carpeta_creada_en_ejecucion or not carpeta_existia_antes)
+            self._rollback.ejecutar(
+                ruta_proyecto,
+                carpeta_creada_en_ejecucion or not carpeta_existia_antes or carpeta_existia_vacia,
+            )
             raise ErrorGeneracionProyecto("Falló la generación del proyecto MVP.") from exc
