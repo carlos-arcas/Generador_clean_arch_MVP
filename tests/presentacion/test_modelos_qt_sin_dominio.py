@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from dominio.especificacion import EspecificacionAtributo, EspecificacionClase
-from aplicacion.dtos_presentacion import DtoAtributoPresentacion, DtoClasePresentacion
-from aplicacion.mapeadores.mapeador_dominio_a_presentacion import (
-    mapear_clase_dominio_a_dto,
-    mapear_dto_a_clase_dominio,
+from presentacion.dtos import DtoVistaAtributo, DtoVistaClase
+from presentacion.mapeadores.mapeador_dominio_a_vista import (
+    mapear_clase_dominio_a_dto_vista,
+    mapear_dto_vista_a_clase_dominio,
 )
 
 
@@ -33,12 +33,12 @@ def test_mapper_convierte_dominio_a_dto() -> None:
         ],
     )
 
-    dto = mapear_clase_dominio_a_dto(clase_dominio)
+    dto = mapear_clase_dominio_a_dto_vista(clase_dominio)
 
-    assert isinstance(dto, DtoClasePresentacion)
+    assert isinstance(dto, DtoVistaClase)
     assert dto.nombre == "Cliente"
     assert dto.atributos == [
-        DtoAtributoPresentacion(
+        DtoVistaAtributo(
             nombre="edad",
             tipo="int",
             obligatorio=False,
@@ -48,10 +48,10 @@ def test_mapper_convierte_dominio_a_dto() -> None:
 
 
 def test_mapper_convierte_dto_a_dominio() -> None:
-    dto = DtoClasePresentacion(
+    dto = DtoVistaClase(
         nombre="Pedido",
         atributos=[
-            DtoAtributoPresentacion(
+            DtoVistaAtributo(
                 nombre="total",
                 tipo="float",
                 obligatorio=True,
@@ -60,7 +60,7 @@ def test_mapper_convierte_dto_a_dominio() -> None:
         ],
     )
 
-    clase_dominio = mapear_dto_a_clase_dominio(dto)
+    clase_dominio = mapear_dto_vista_a_clase_dominio(dto)
 
     assert isinstance(clase_dominio, EspecificacionClase)
     assert clase_dominio.nombre == "Pedido"

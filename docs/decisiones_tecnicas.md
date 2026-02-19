@@ -114,3 +114,9 @@ Se incorporan `openpyxl` y `reportlab` con versión fija en `requirements.txt` d
 - evitar diferencias de comportamiento por versión,
 - asegurar que proyectos con blueprints de informes ejecuten pruebas desde cero,
 - simplificar auditoría de dependencias requeridas.
+
+## DTOs y mapeadores de UI viven en presentación
+Se movieron los DTOs usados por interfaz (`DtoVistaClase`, `DtoVistaAtributo`) y su mapeador a `presentacion/`.
+La aplicación no debe conocer estructuras de vista, porque su contrato es orquestar casos de uso, no preparar widgets.
+Ubicar este mapeo en presentación reduce acoplamiento y elimina dependencias arquitectónicas inversas detectadas como P0.
+Además, la UI mantiene autonomía para adaptar nombres/campos visuales sin forzar cambios en aplicación o dominio.

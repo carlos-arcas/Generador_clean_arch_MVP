@@ -1,18 +1,18 @@
-"""Adaptador anti-corrupción para mapear dominio hacia DTOs de presentación."""
+"""Adaptador anti-corrupción para mapear dominio hacia DTOs de vista."""
 
 from __future__ import annotations
 
-from aplicacion.dtos_presentacion import DtoAtributoPresentacion, DtoClasePresentacion
 from dominio.especificacion import EspecificacionAtributo, EspecificacionClase
+from presentacion.dtos import DtoVistaAtributo, DtoVistaClase
 
 
-def mapear_clase_dominio_a_dto(clase_dominio: EspecificacionClase) -> DtoClasePresentacion:
-    """Convierte una entidad de dominio de clase a DTO de presentación."""
+def mapear_clase_dominio_a_dto_vista(clase_dominio: EspecificacionClase) -> DtoVistaClase:
+    """Convierte una entidad de dominio de clase a DTO de vista."""
 
-    return DtoClasePresentacion(
+    return DtoVistaClase(
         nombre=clase_dominio.nombre,
         atributos=[
-            DtoAtributoPresentacion(
+            DtoVistaAtributo(
                 nombre=atributo.nombre,
                 tipo=atributo.tipo,
                 obligatorio=atributo.obligatorio,
@@ -23,8 +23,8 @@ def mapear_clase_dominio_a_dto(clase_dominio: EspecificacionClase) -> DtoClasePr
     )
 
 
-def mapear_dto_a_clase_dominio(dto: DtoClasePresentacion) -> EspecificacionClase:
-    """Convierte un DTO de presentación de clase a entidad de dominio."""
+def mapear_dto_vista_a_clase_dominio(dto: DtoVistaClase) -> EspecificacionClase:
+    """Convierte un DTO de vista de clase a entidad de dominio."""
 
     return EspecificacionClase(
         nombre=dto.nombre,
