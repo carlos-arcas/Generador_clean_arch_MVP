@@ -1,0 +1,15 @@
+........................................................................ [ 26%]
+........................................................................ [ 52%]
+........................................................................ [ 78%]
+..........................................................               [100%]
+=============================== warnings summary ===============================
+tests/calidad/test_auditoria_diseno_cohesion_v4.py::test_auditoria_diseno_cohesion_v4_bloquea_regresiones_criticas
+  /root/.pyenv/versions/3.12.12/lib/python3.12/site-packages/_pytest/python.py:159: UserWarning: Auditoría v4 reporta 6 hallazgos MEDIO (no bloqueante).
+    result = testfunction(**testargs)
+
+tests/calidad/test_auditoria_v5.py::test_auditoria_diseno_cohesion_v5_bloquea_regresiones_criticas
+  /root/.pyenv/versions/3.12.12/lib/python3.12/site-packages/_pytest/python.py:159: UserWarning: Auditoría v5 reporta 1 hallazgos MEDIO (no bloqueante).
+    result = testfunction(**testargs)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+274 passed, 15 skipped, 2 warnings in 2.37s
