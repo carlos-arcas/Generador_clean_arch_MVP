@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
 )
 
 from aplicacion.casos_uso.construir_especificacion_proyecto import ConstruirEspecificacionProyecto
+from aplicacion.casos_uso.validar_compatibilidad_blueprints import ValidarCompatibilidadBlueprints
+from aplicacion.dtos.blueprints import DtoBlueprintMetadata
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
@@ -80,6 +82,7 @@ class WizardGeneradorProyectos(QWizard):
         cargar_preset: CargarPresetProyecto | None = None,
         guardar_credencial: GuardarCredencial | None = None,
         catalogo_blueprints: list[tuple[str, str, str]] | None = None,
+        metadata_blueprints: dict[str, DtoBlueprintMetadata] | None = None,
         orquestador_finalizacion: OrquestadorFinalizacionWizard | None = None,
     ) -> None:
         super().__init__()
@@ -92,6 +95,7 @@ class WizardGeneradorProyectos(QWizard):
             cargar_preset=cargar_preset,
             guardar_credencial=guardar_credencial,
             catalogo_blueprints=catalogo_blueprints,
+            metadata_blueprints=metadata_blueprints,
             orquestador_finalizacion=orquestador_finalizacion,
         )
         self._crear_widgets()
@@ -110,6 +114,7 @@ class WizardGeneradorProyectos(QWizard):
         cargar_preset: CargarPresetProyecto | None,
         guardar_credencial: GuardarCredencial | None,
         catalogo_blueprints: list[tuple[str, str, str]] | None,
+        metadata_blueprints: dict[str, DtoBlueprintMetadata] | None,
         orquestador_finalizacion: OrquestadorFinalizacionWizard | None,
     ) -> None:
         if generar_proyecto is None and generador_mvp is not None:
@@ -136,10 +141,12 @@ class WizardGeneradorProyectos(QWizard):
         self._guardar_credencial = guardar_credencial
         self._catalogo_blueprints = catalogo_blueprints
         self._constructor_especificacion = ConstruirEspecificacionProyecto()
+        self._metadata_blueprints = metadata_blueprints or {}
         self._orquestador_finalizacion = orquestador_finalizacion or OrquestadorFinalizacionWizard(
             validador_final=self._constructor_especificacion.ejecutar,
             lanzador_generacion=self._lanzar_generacion_asincrona,
             servicio_credenciales=self._guardar_credencial,
+            validador_compatibilidad_blueprints=ValidarCompatibilidadBlueprints(self._metadata_blueprints),
         )
 
     def _dependencias_faltantes(
@@ -188,6 +195,7 @@ class WizardGeneradorProyectos(QWizard):
         self.button(QWizard.FinishButton).clicked.connect(self._al_finalizar)
 
     def _inicializar_estado(self) -> None:
+        self.pagina_persistencia.establecer_metadata_blueprints(self._metadata_blueprints)
         self.pagina_persistencia.establecer_blueprints_disponibles(
             self._catalogo_blueprints,
             BLUEPRINTS_MVP,
@@ -214,6 +222,28 @@ class WizardGeneradorProyectos(QWizard):
             QMessageBox.warning(self, "Credenciales", advertencia_credenciales)
 
         if resultado.exito:
+            return
+
+        conflictos_declarativos = detalles.get("conflictos_declarativos", []) if isinstance(detalles, dict) else []
+        if conflictos_declarativos:
+            lineas = []
+            for conflicto in conflictos_declarativos:
+                lineas.append(
+                    "\n".join(
+                        [
+                            f"Código: {conflicto.codigo}",
+                            f"Blueprint A: {conflicto.blueprint_a}",
+                            f"Blueprint B: {conflicto.blueprint_b or 'N/A'}",
+                            f"Motivo: {conflicto.motivo}",
+                            f"Acción sugerida: {conflicto.accion_sugerida}",
+                        ]
+                    )
+                )
+            QMessageBox.critical(
+                self,
+                "Incompatibilidad declarativa",
+                "\n\n".join(lineas),
+            )
             return
 
         self._cambiar_estado_generando(False, "")

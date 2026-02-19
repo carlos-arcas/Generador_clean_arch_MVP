@@ -32,6 +32,7 @@ def main() -> int:
         cargar_preset=contenedor.cargar_preset_proyecto,
         guardar_credencial=contenedor.guardar_credencial,
         catalogo_blueprints=contenedor.consultar_catalogo_blueprints.ejecutar(),
+        metadata_blueprints=contenedor.metadata_blueprints,
     )
     wizard.show()
     return app.exec()
