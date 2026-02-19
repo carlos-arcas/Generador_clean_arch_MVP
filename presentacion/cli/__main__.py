@@ -38,7 +38,7 @@ def construir_parser() -> argparse.ArgumentParser:
         "auditar-finalizacion", help="Ejecuta auditoría E2E desde preset hasta sandbox"
     )
     auditar_finalizacion.add_argument("--preset", required=True, help="Ruta del preset en disco")
-    auditar_finalizacion.add_argument("--salida", required=True, help="Ruta sandbox de auditoría")
+    auditar_finalizacion.add_argument("--sandbox", required=True, help="Ruta sandbox de auditoría")
 
     return parser
 

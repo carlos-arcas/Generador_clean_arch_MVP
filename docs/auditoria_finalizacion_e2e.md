@@ -1,33 +1,64 @@
-# Plantilla de Auditoría de finalización E2E
+# Auditoría de finalización E2E (informe real)
 
-Este documento describe el formato del informe generado por el comando:
+- ID ejecución: `AUD-20260219-124556-3614`
+- Fecha/hora ISO: `2026-02-19T12:45:56`
+- Ruta sandbox absoluta: `/tmp/auditoria_finalizacion_real`
+- Ruta evidencias: `docs/evidencias_finalizacion/AUD-20260219-124556-3614`
+- Preset: `/tmp/preset_auditoria_real.json`
 
-`python -m presentacion.cli auditar-finalizacion --preset <ruta> --salida <ruta_sandbox>`
+## Tabla de etapas
 
-## Estructura mínima
+| Etapa | Estado | Duración ms | Resumen |
+|---|---|---:|---|
+| Preparación | PASS | 0 | Contexto listo |
+| Carga preset | PASS | 0 | Blueprints: 2 |
+| Preflight conflictos | FAIL | 10 | Error en preflight |
+| Generación sandbox | SKIP | 0 | No ejecutada por fallo preflight |
+| Auditoría arquitectura | SKIP | 0 | No ejecutada por fallo preflight |
+| Smoke test | SKIP | 0 | No ejecutada por fallo preflight |
 
-- ID de ejecución (`AUD-...`)
-- Fecha/hora
-- Ruta sandbox
-- Tabla de etapas con estado `PASS/FAIL/SKIP`
-- Evidencias por etapa
-- Conflictos detectados (total, primeras rutas y recomendación)
-- Pasos de reproducción y ubicación de logs
+## Evidencias por etapa
 
-## Etapas
+### Preparacion
+```text
+Sandbox: /tmp/auditoria_finalizacion_real
+Evidencias: docs/evidencias_finalizacion/AUD-20260219-124556-3614
+```
 
-1. Preparación de contexto
-2. Carga de preset
-3. Preflight de conflictos (rutas duplicadas)
-4. Ejecución en sandbox
-5. Auditoría de arquitectura
-6. Smoke test (compileall/pytest)
+### Carga Preset
+```text
+crud_json
+crud_sqlite
+```
 
-## Recomendaciones de conflictos
+### Preflight Conflictos
+```text
+El blueprint crud_json requiere al menos una clase en la especificación.
+```
 
-Cuando hay rutas duplicadas:
+### Generacion Sandbox
+```text
+No ejecutada
+```
 
-- mostrar el total de rutas duplicadas
-- listar entre 3 y 5 rutas
-- recomendar revisar la selección de blueprints
-- sugerir explícitamente posible solapamiento: CRUD de `persona` duplicado
+### Auditoria Arquitectura
+```text
+No ejecutada
+```
+
+### Smoke Test
+```text
+No ejecutada
+```
+
+## Diagnóstico y recomendación
+
+```text
+Fallo inesperado detectado.
+ID incidente: AUD-20260219-124556-3614
+Ruta logs: docs/evidencias_finalizacion/AUD-20260219-124556-3614
+```
+
+## Comandos de reproducción
+
+`python -m presentacion.cli auditar-finalizacion --preset /tmp/preset_auditoria_real.json --sandbox /tmp/auditoria_finalizacion_real`
