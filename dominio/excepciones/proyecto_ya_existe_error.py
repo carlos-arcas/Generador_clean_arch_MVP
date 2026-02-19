@@ -3,5 +3,8 @@
 from __future__ import annotations
 
 
-class ProyectoYaExisteError(Exception):
+from dominio.errores import ErrorInvarianteDominio
+
+
+class ProyectoYaExisteError(ErrorInvarianteDominio):
     """Se lanza cuando la carpeta destino del proyecto ya contiene archivos."""

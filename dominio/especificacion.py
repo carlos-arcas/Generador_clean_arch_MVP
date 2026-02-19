@@ -6,13 +6,10 @@ from dataclasses import dataclass, field
 import re
 from uuid import uuid4
 
+from dominio.errores import ErrorValidacionDominio
+
 PATRON_SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 PATRON_PASCAL_CASE = re.compile(r"^[A-Z][A-Za-z0-9]*$")
-
-
-class ErrorValidacionDominio(ValueError):
-    """Error de validación para entidades de dominio."""
-
 
 @dataclass
 class EspecificacionAtributo:

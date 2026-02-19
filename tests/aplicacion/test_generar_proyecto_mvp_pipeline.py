@@ -11,11 +11,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
 )
-from aplicacion.casos_uso.generacion.pasos.errores_pipeline import (
-    ErrorAuditoriaGeneracion,
-    ErrorPreparacionEstructuraGeneracion,
-    ErrorPublicacionManifestGeneracion,
-)
+from aplicacion.errores import ErrorGeneracionProyecto
 from dominio.modelos import ArchivoGenerado, EspecificacionProyecto, PlanGeneracion
 
 
@@ -103,7 +99,7 @@ def test_falla_preparar_estructura_ejecuta_rollback(tmp_path: Path) -> None:
         auditor=AuditorFalso(),
     )
 
-    with pytest.raises(ErrorPreparacionEstructuraGeneracion):
+    with pytest.raises(ErrorGeneracionProyecto):
         caso_uso.ejecutar(_entrada(tmp_path))
 
     assert not (tmp_path / "demo").exists()
@@ -118,7 +114,7 @@ def test_falla_publicar_manifest_ejecuta_rollback(tmp_path: Path) -> None:
         auditor=AuditorFalso(),
     )
 
-    with pytest.raises(ErrorPublicacionManifestGeneracion):
+    with pytest.raises(ErrorGeneracionProyecto):
         caso_uso.ejecutar(_entrada(tmp_path))
 
     assert not (tmp_path / "demo").exists()
@@ -133,7 +129,7 @@ def test_falla_auditoria_ejecuta_rollback(tmp_path: Path) -> None:
         auditor=AuditorFalso(falla=True),
     )
 
-    with pytest.raises(ErrorAuditoriaGeneracion):
+    with pytest.raises(ErrorGeneracionProyecto):
         caso_uso.ejecutar(_entrada(tmp_path))
 
     assert not (tmp_path / "demo").exists()

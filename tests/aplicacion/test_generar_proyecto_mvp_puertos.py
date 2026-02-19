@@ -9,7 +9,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
 )
-from aplicacion.casos_uso.generacion.pasos.errores_pipeline import ErrorPublicacionManifestGeneracion
+from aplicacion.errores import ErrorGeneracionProyecto
 from dominio.modelos import ArchivoGenerado, EspecificacionProyecto, PlanGeneracion
 
 
@@ -98,7 +98,7 @@ def test_generar_proyecto_mvp_error_si_falla_puerto_manifest(tmp_path: Path) -> 
         auditor=AuditorFalso(),
     )
 
-    with pytest.raises(ErrorPublicacionManifestGeneracion):
+    with pytest.raises(ErrorGeneracionProyecto):
         caso_uso.ejecutar(_entrada(tmp_path))
 
 
