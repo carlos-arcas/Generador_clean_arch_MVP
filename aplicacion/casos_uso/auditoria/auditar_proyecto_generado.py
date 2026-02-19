@@ -6,8 +6,15 @@ from dataclasses import dataclass, field
 import json
 import logging
 from pathlib import Path
-import re
 import subprocess
+
+from aplicacion.casos_uso.auditoria.reglas_dependencias import (
+    ReglaAplicacionNoDependeInfraestructura,
+    ReglaDependencia,
+    ReglaDominioNoDependeDeOtrasCapas,
+    ReglaPresentacionNoDependeDominio,
+)
+from aplicacion.casos_uso.auditoria.validadores.validador_base import ContextoAuditoria
 
 LOGGER = logging.getLogger(__name__)
 
@@ -45,8 +52,17 @@ class AuditarProyectoGenerado:
         "requirements.txt",
     ]
 
-    def __init__(self, ejecutar_pytest: bool = False) -> None:
+    def __init__(
+        self,
+        ejecutar_pytest: bool = False,
+        reglas_dependencias: list[ReglaDependencia] | None = None,
+    ) -> None:
         self._ejecutar_pytest = ejecutar_pytest
+        self._reglas_dependencias = reglas_dependencias or [
+            ReglaPresentacionNoDependeDominio(),
+            ReglaAplicacionNoDependeInfraestructura(),
+            ReglaDominioNoDependeDeOtrasCapas(),
+        ]
 
     def auditar(self, ruta_proyecto: str) -> ResultadoAuditoria:
         """Ejecuta la auditoría del proyecto generado."""
@@ -109,37 +125,10 @@ class AuditarProyectoGenerado:
         return []
 
     def _validar_dependencias_capas(self, base: Path) -> list[str]:
+        contexto = ContextoAuditoria(base=base)
         errores: list[str] = []
-        patron_import = re.compile(r"^\s*import\s+([\w\.]+)", re.MULTILINE)
-        patron_from = re.compile(r"^\s*from\s+([\w\.]+)\s+import\s+", re.MULTILINE)
-
-        for archivo in base.rglob("*.py"):
-            try:
-                relativo = archivo.relative_to(base)
-            except ValueError:
-                continue
-            if not relativo.parts:
-                continue
-
-            capa = relativo.parts[0]
-            if capa not in {"dominio", "aplicacion"}:
-                continue
-
-            contenido = archivo.read_text(encoding="utf-8")
-            imports = set(patron_import.findall(contenido)) | set(patron_from.findall(contenido))
-            for modulo in imports:
-                modulo_normalizado = modulo.lower()
-                if capa == "dominio" and (
-                    modulo_normalizado.startswith("infraestructura")
-                    or modulo_normalizado.startswith("presentacion")
-                ):
-                    errores.append(
-                        f"Import prohibido en dominio ({relativo}): {modulo}"
-                    )
-                if capa == "aplicacion" and modulo_normalizado.startswith("presentacion"):
-                    errores.append(
-                        f"Import prohibido en aplicacion ({relativo}): {modulo}"
-                    )
+        for regla in self._reglas_dependencias:
+            errores.extend(regla.evaluar(contexto).errores)
         return errores
 
     def _ejecutar_pytest_opcional(self, base: Path) -> list[str]:
