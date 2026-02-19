@@ -12,6 +12,8 @@ from typing import Iterable
 DIRECTORIOS_IGNORADOS = {".git", ".venv", "__pycache__", ".pytest_cache"}
 SECCIONES_OBLIGATORIAS = {"A", "B", "C", "D", "E"}
 PATRON_SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
+PATRON_IMPORT = re.compile(r"^\s*import\s+([\w\.]+)")
+PATRON_FROM = re.compile(r"^\s*from\s+([\w\.]+)\s+import\b")
 
 
 @dataclass(frozen=True)
@@ -180,6 +182,18 @@ def _detectar_ciclos(grafo: dict[str, set[str]]) -> list[list[str]]:
     return ciclos
 
 
+def _extraer_modulo_importado(linea: str) -> str | None:
+    coincidencia_import = PATRON_IMPORT.match(linea)
+    if coincidencia_import:
+        return coincidencia_import.group(1)
+
+    coincidencia_from = PATRON_FROM.match(linea)
+    if coincidencia_from:
+        return coincidencia_from.group(1)
+
+    return None
+
+
 def _evaluar_estructura(ruta_repo: Path) -> ResultadoSeccion:
     faltantes: list[Hallazgo] = []
     evidencias: list[str] = []
@@ -227,9 +241,10 @@ def _evaluar_estructura(ruta_repo: Path) -> ResultadoSeccion:
             limpia = linea.strip()
             if not limpia.startswith(("import ", "from ")):
                 continue
+            modulo_importado = _extraer_modulo_importado(linea)
             if relativa.startswith("dominio/") and any(
-                token in limpia
-                for token in ("aplicacion", "infraestructura", "presentacion")
+                modulo_importado == capa or (modulo_importado or "").startswith(f"{capa}.")
+                for capa in ("aplicacion", "infraestructura", "presentacion")
             ):
                 puntaje -= 0.4
                 faltantes.append(
@@ -238,11 +253,12 @@ def _evaluar_estructura(ruta_repo: Path) -> ResultadoSeccion:
                         "A",
                         "Dominio depende de capas externas",
                         "Eliminar dependencia en dominio",
-                        f"{relativa}:{idx}",
+                        f"{relativa}:{idx} -> {modulo_importado or limpia}",
                     )
                 )
             if relativa.startswith("aplicacion/") and any(
-                token in limpia for token in ("infraestructura", "presentacion")
+                modulo_importado == capa or (modulo_importado or "").startswith(f"{capa}.")
+                for capa in ("infraestructura", "presentacion")
             ):
                 puntaje -= 0.4
                 faltantes.append(
@@ -251,10 +267,18 @@ def _evaluar_estructura(ruta_repo: Path) -> ResultadoSeccion:
                         "A",
                         "Aplicación depende de infraestructura/presentación",
                         "Usar puertos e inversión de dependencias",
-                        f"{relativa}:{idx}",
+                        f"{relativa}:{idx} -> {modulo_importado or limpia}",
                     )
                 )
-            if relativa.startswith("presentacion/") and "infraestructura" in limpia and "bootstrap" not in limpia:
+            if (
+                relativa.startswith("presentacion/")
+                and modulo_importado is not None
+                and (modulo_importado == "infraestructura" or modulo_importado.startswith("infraestructura."))
+                and not (
+                    modulo_importado == "infraestructura.bootstrap"
+                    or modulo_importado.startswith("infraestructura.bootstrap.")
+                )
+            ):
                 puntaje -= 0.3
                 faltantes.append(
                     Hallazgo(
@@ -262,7 +286,7 @@ def _evaluar_estructura(ruta_repo: Path) -> ResultadoSeccion:
                         "A",
                         "Presentación importa infraestructura directa",
                         "Mover al composition root o documentar excepción",
-                        f"{relativa}:{idx}",
+                        f"{relativa}:{idx} -> {modulo_importado}",
                     )
                 )
 

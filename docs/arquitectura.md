@@ -34,7 +34,7 @@ Para evitar regresiones en dependencias entre capas, el proyecto incluye una pru
 
 Esta prueba recorre los archivos Python del repositorio y valida las siguientes reglas:
 
-1. **Regla 1**: `aplicacion/` no puede importar `infraestructura`.
+1. **Regla 1**: `aplicacion/` no puede importar `infraestructura` ni `presentacion`.
 2. **Regla 2**: `dominio/` no puede importar `aplicacion`, `infraestructura` ni `presentacion`.
 3. **Regla 3**: `presentacion/` no puede importar `infraestructura`, salvo `infraestructura.bootstrap`.
 
@@ -73,6 +73,12 @@ Si se detecta una importación prohibida, la prueba falla indicando de forma exp
 - línea detectada
 
 De esta forma, la arquitectura se valida de manera ejecutable en cada ejecución de tests.
+
+## Exportaciones públicas de reglas de auditoría
+El paquete `aplicacion.casos_uso.auditoria.reglas_dependencias` mantiene API pública
+estable con resolución diferida (`__getattr__`) en su `__init__.py`. Esto evita
+imports adelantados y reduce falsos positivos en validaciones arquitectónicas sin
+romper `from ...reglas_dependencias import Regla...`.
 
 ## DTOs y mapeadores de vista
 Los artefactos de UI se ubican en `presentacion/dtos/` y `presentacion/mapeadores/`.

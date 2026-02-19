@@ -65,6 +65,13 @@ def _es_import_infraestructura_prohibido(linea: str) -> bool:
     return modulo == "infraestructura" or modulo.startswith("infraestructura.")
 
 
+def _es_import_presentacion_prohibido_en_aplicacion(linea: str) -> bool:
+    modulo = _extraer_modulo_importado(linea)
+    if not modulo:
+        return False
+    return modulo == "presentacion" or modulo.startswith("presentacion.")
+
+
 def _analizar_archivo(raiz: Path, archivo: Path) -> list[ViolacionArquitectura]:
     violaciones: list[ViolacionArquitectura] = []
     relativa = archivo.relative_to(raiz)
@@ -72,13 +79,16 @@ def _analizar_archivo(raiz: Path, archivo: Path) -> list[ViolacionArquitectura]:
 
     for indice, linea in enumerate(contenido.splitlines(), start=1):
         if relativa.parts[0] == "aplicacion":
-            if _es_import_infraestructura_prohibido(linea):
+            if _es_import_infraestructura_prohibido(linea) or _es_import_presentacion_prohibido_en_aplicacion(linea):
                 violaciones.append(
                     ViolacionArquitectura(
                         archivo=relativa.as_posix(),
                         linea_numero=indice,
                         linea=linea,
-                        regla="Regla 1 violada (aplicacion no puede depender de infraestructura)",
+                        regla=(
+                            "Regla 1 violada "
+                            "(aplicacion no puede depender de infraestructura/presentacion)"
+                        ),
                     )
                 )
 

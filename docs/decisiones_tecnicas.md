@@ -120,3 +120,10 @@ Se movieron los DTOs usados por interfaz (`DtoVistaClase`, `DtoVistaAtributo`) y
 La aplicación no debe conocer estructuras de vista, porque su contrato es orquestar casos de uso, no preparar widgets.
 Ubicar este mapeo en presentación reduce acoplamiento y elimina dependencias arquitectónicas inversas detectadas como P0.
 Además, la UI mantiene autonomía para adaptar nombres/campos visuales sin forzar cambios en aplicación o dominio.
+
+## Auditor de completitud: evidencia por import real y `__init__` mínimo
+Se ajusta el auditor de completitud para evaluar dependencias por el módulo importado real,
+en lugar de heurísticas por coincidencia textual de palabras en la línea. Con esto se evitan
+falsos positivos cuando un nombre de archivo contiene términos como `infraestructura` sin
+implicar una dependencia a esa capa. Además, el paquete de reglas de dependencias conserva
+su API pública con imports diferidos en `__init__.py` para minimizar acoplamiento en carga.
