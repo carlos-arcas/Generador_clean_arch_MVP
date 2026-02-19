@@ -13,6 +13,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
 )
+from aplicacion.casos_uso.generacion.pasos.errores_pipeline import ErrorEjecucionPlanGeneracion
 from dominio.excepciones.proyecto_ya_existe_error import ProyectoYaExisteError
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 from infraestructura.manifest.generador_manifest import GeneradorManifest
@@ -85,7 +86,7 @@ def test_rollback_elimina_carpeta_cuando_hay_fallo_interno(tmp_path: Path) -> No
         generador_manifest=GeneradorManifest(),
     )
 
-    salida = caso_uso.ejecutar(_entrada(tmp_path))
+    with pytest.raises(ErrorEjecucionPlanGeneracion):
+        caso_uso.ejecutar(_entrada(tmp_path))
 
-    assert salida.valido is False
     assert not (tmp_path / "proyecto_seguro").exists()

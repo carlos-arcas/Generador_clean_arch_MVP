@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from pathlib import Path
 
 from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import ResultadoAuditoria
@@ -7,6 +9,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
 )
+from aplicacion.casos_uso.generacion.pasos.errores_pipeline import ErrorPublicacionManifestGeneracion
 from dominio.modelos import ArchivoGenerado, EspecificacionProyecto, PlanGeneracion
 
 
@@ -95,10 +98,8 @@ def test_generar_proyecto_mvp_error_si_falla_puerto_manifest(tmp_path: Path) -> 
         auditor=AuditorFalso(),
     )
 
-    salida = caso_uso.ejecutar(_entrada(tmp_path))
-
-    assert salida.valido is False
-    assert "manifest roto" in salida.errores[0]
+    with pytest.raises(ErrorPublicacionManifestGeneracion):
+        caso_uso.ejecutar(_entrada(tmp_path))
 
 
 def test_generar_proyecto_mvp_limite_blueprints_vacios(tmp_path: Path) -> None:
