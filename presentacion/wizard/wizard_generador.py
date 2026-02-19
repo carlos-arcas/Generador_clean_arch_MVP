@@ -93,7 +93,7 @@ class WizardGeneradorProyectos(QWizard):
         if dependencias_faltantes:
             raise ValueError(
                 "El wizard requiere casos de uso inyectados. "
-                "Construye las dependencias con infraestructura.bootstrap.construir_contenedor_aplicacion()."
+                "Construye las dependencias con infraestructura.bootstrap.bootstrap_gui.construir_contenedor_gui()."
             )
 
         self._controlador = controlador or ControladorWizardProyecto()

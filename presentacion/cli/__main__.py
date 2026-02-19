@@ -7,7 +7,8 @@ import logging
 from pathlib import Path
 
 from aplicacion.errores import ErrorAplicacion, ErrorAuditoria
-from infraestructura.bootstrap import configurar_logging, construir_contenedor_aplicacion
+from infraestructura.bootstrap import configurar_logging
+from infraestructura.bootstrap.bootstrap_cli import construir_contenedor_cli
 
 LOGGER = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def _ejecutar_validar_preset(args: argparse.Namespace, contenedor) -> int:
 
 
 def _ejecutar_auditar(args: argparse.Namespace, contenedor) -> int:
-    resultado = contenedor.auditar_proyecto_generado.ejecutar(args.proyecto)
+    resultado = contenedor.auditar_proyecto.ejecutar(args.proyecto)
     if not resultado.valido:
         raise ErrorAuditoria("Auditoría rechazada: " + "; ".join(resultado.lista_errores))
     LOGGER.info("Auditoría aprobada: %s", resultado.resumen)
@@ -86,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     configurar_logging("logs")
     parser = construir_parser()
     args = parser.parse_args(argv)
-    contenedor = construir_contenedor_aplicacion()
+    contenedor = construir_contenedor_cli()
     try:
         if args.comando == "generar":
             return _ejecutar_generar(args, contenedor)

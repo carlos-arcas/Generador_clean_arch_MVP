@@ -19,10 +19,10 @@ def test_construir_contenedor_aplicacion_expone_casos_de_uso_principales() -> No
     assert contenedor.guardar_credencial is not None
 
 
-def test_cli_importa_solo_bootstrap_de_infraestructura() -> None:
+def test_cli_importa_bootstrap_por_contexto() -> None:
     contenido = Path("presentacion/cli/__main__.py").read_text(encoding="utf-8")
 
-    assert "from infraestructura.bootstrap import" in contenido
+    assert "from infraestructura.bootstrap.bootstrap_cli import construir_contenedor_cli" in contenido
 
 
 def test_wizard_no_importa_infraestructura_directamente() -> None:

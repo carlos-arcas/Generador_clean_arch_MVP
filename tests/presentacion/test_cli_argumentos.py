@@ -33,7 +33,7 @@ def test_parser_generar_reconoce_argumentos() -> None:
 
 def test_main_invoca_comando_generar(monkeypatch) -> None:
     monkeypatch.setattr(cli, "configurar_logging", lambda _: None)
-    monkeypatch.setattr(cli, "construir_contenedor_aplicacion", lambda: SimpleNamespace())
+    monkeypatch.setattr(cli, "construir_contenedor_cli", lambda: SimpleNamespace())
     monkeypatch.setattr(cli, "_ejecutar_generar", lambda args, _: 0)
 
     resultado = cli.main(["generar", "--preset", "a.json", "--destino", "salida"])
@@ -43,7 +43,7 @@ def test_main_invoca_comando_generar(monkeypatch) -> None:
 
 def test_main_invoca_comando_validar(monkeypatch) -> None:
     monkeypatch.setattr(cli, "configurar_logging", lambda _: None)
-    monkeypatch.setattr(cli, "construir_contenedor_aplicacion", lambda: SimpleNamespace())
+    monkeypatch.setattr(cli, "construir_contenedor_cli", lambda: SimpleNamespace())
     monkeypatch.setattr(cli, "_ejecutar_validar_preset", lambda args, _: 0)
 
     resultado = cli.main(["validar-preset", "--preset", "a.json"])

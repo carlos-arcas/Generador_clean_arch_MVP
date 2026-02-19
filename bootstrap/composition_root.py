@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from infraestructura.bootstrap import (  # noqa: F401
     ContenedorAplicacion,
+    ContenedorCli,
+    ContenedorGui,
     configurar_logging,
     construir_contenedor_aplicacion,
+    construir_contenedor_cli,
+    construir_contenedor_gui,
 )
 
 
@@ -17,7 +21,11 @@ def crear_contenedor() -> ContenedorAplicacion:
 
 __all__ = [
     "ContenedorAplicacion",
+    "ContenedorCli",
+    "ContenedorGui",
     "crear_contenedor",
     "construir_contenedor_aplicacion",
+    "construir_contenedor_cli",
+    "construir_contenedor_gui",
     "configurar_logging",
 ]
