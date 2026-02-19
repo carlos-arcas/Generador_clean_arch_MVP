@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import argparse
 import logging
-from pathlib import Path
-
 from aplicacion.errores import ErrorAplicacion, ErrorAuditoria
 from infraestructura.bootstrap import configurar_logging
 from infraestructura.bootstrap.bootstrap_cli import construir_contenedor_cli
+from presentacion.cli.comandos.comando_generar import ejecutar_comando_generar
 
 LOGGER = logging.getLogger(__name__)
 
@@ -38,35 +37,7 @@ def construir_parser() -> argparse.ArgumentParser:
 
 
 def _ejecutar_generar(args: argparse.Namespace, contenedor) -> int:
-    preset = contenedor.cargar_preset_proyecto.ejecutar(args.preset)
-    preset.especificacion.ruta_destino = args.destino
-
-    blueprints_objetivo = args.blueprint or preset.blueprints
-    ruta_manifest = Path(args.destino) / "manifest.json"
-    modo_patch = args.patch or ruta_manifest.exists()
-
-    if modo_patch:
-        plan = contenedor.crear_plan_patch_desde_blueprints.ejecutar(preset.especificacion, args.destino)
-    else:
-        plan = contenedor.crear_plan_desde_blueprints.ejecutar(
-            preset.especificacion,
-            blueprints_objetivo,
-        )
-
-    contenedor.ejecutar_plan.ejecutar(
-        plan=plan,
-        ruta_destino=args.destino,
-        opciones=preset.metadata,
-        version_generador=Path("VERSION").read_text(encoding="utf-8").strip(),
-        blueprints_usados=[f"{nombre}@1.0.0" for nombre in blueprints_objetivo],
-        generar_manifest=not modo_patch,
-    )
-
-    if modo_patch:
-        contenedor.actualizar_manifest_patch.ejecutar(args.destino, plan)
-
-    LOGGER.info("Generación completada en %s", args.destino)
-    return 0
+    return ejecutar_comando_generar(args, contenedor)
 
 
 def _ejecutar_validar_preset(args: argparse.Namespace, contenedor) -> int:
