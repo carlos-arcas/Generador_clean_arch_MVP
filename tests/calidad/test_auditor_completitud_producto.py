@@ -88,10 +88,20 @@ def test_auditoria_falla_critica_si_falta_script_tests(tmp_path: Path) -> None:
     assert any("ejecutar_tests.bat" in hallazgo.descripcion for hallazgo in resultado.hallazgos)
 
 
-def test_auditoria_detecta_print(tmp_path: Path) -> None:
+def test_auditoria_detecta_print_fuera_de_tests(tmp_path: Path) -> None:
     _crear_repo_minimo(tmp_path)
-    _crear_archivo(tmp_path / "dominio" / "consola.py", "def demo():\n    print('debug')\n")
+    _crear_archivo(tmp_path / "herramientas" / "x.py", "def demo():\n    print('x')\n")
 
     resultado = auditar_completitud_producto(tmp_path)
 
-    assert any("print(" in item for item in resultado.prints_detectados)
+    assert any("herramientas/x.py" in item for item in resultado.prints_detectados)
+    assert any(h.prioridad == "P1" and h.seccion == "D" for h in resultado.hallazgos)
+
+
+def test_auditoria_no_detecta_print_dentro_de_tests(tmp_path: Path) -> None:
+    _crear_repo_minimo(tmp_path)
+    _crear_archivo(tmp_path / "tests" / "test_algo.py", "def test_algo():\n    print('x')\n    assert True\n")
+
+    resultado = auditar_completitud_producto(tmp_path)
+
+    assert not any("tests/test_algo.py" in item for item in resultado.prints_detectados)
