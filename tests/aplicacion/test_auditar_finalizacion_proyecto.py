@@ -73,7 +73,7 @@ def test_conflicto_preflight_falla_y_no_escribe_proyecto(tmp_path: Path) -> None
         )
     )
 
-    assert any(etapa.nombre == "Preflight conflictos" and etapa.estado == "FAIL" for etapa in salida.etapas)
+    assert any(etapa.nombre == "Preflight conflictos de rutas" and etapa.estado == "FAIL" for etapa in salida.etapas)
     assert salida.conflictos is not None
     assert not (Path(salida.ruta_sandbox) / "Demo").exists()
 

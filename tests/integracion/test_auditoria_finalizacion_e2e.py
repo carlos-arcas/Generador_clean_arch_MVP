@@ -64,7 +64,7 @@ def test_e2e_conflicto_duplicados_corta_antes_de_generar(tmp_path: Path) -> None
         )
     )
 
-    assert any(etapa.estado == "FAIL" for etapa in salida.etapas if etapa.nombre == "Preflight conflictos")
+    assert any(etapa.estado == "FAIL" for etapa in salida.etapas if etapa.nombre == "Preflight conflictos de rutas")
     assert salida.conflictos is not None
 
 

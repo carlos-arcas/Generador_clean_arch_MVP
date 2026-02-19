@@ -6,10 +6,15 @@ from .dto_auditoria_finalizacion_salida import (
     DtoAuditoriaFinalizacionSalida,
     ResultadoEtapa,
 )
+from .tipos_fallo import CONFLICTO, INESPERADO, IO, VALIDACION
 
 __all__ = [
     "DtoAuditoriaFinalizacionEntrada",
     "DtoAuditoriaFinalizacionSalida",
     "ResultadoEtapa",
     "ConflictosFinalizacion",
+    "VALIDACION",
+    "CONFLICTO",
+    "IO",
+    "INESPERADO",
 ]

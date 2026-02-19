@@ -10,11 +10,16 @@ import secrets
 import tempfile
 import time
 import traceback
+from types import TracebackType
 
 from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import AuditarProyectoGenerado
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvp, GenerarProyectoMvpEntrada
 from aplicacion.dtos.auditoria import (
+    CONFLICTO,
+    INESPERADO,
+    IO,
+    VALIDACION,
     ConflictosFinalizacion,
     DtoAuditoriaFinalizacionEntrada,
     DtoAuditoriaFinalizacionSalida,
@@ -22,6 +27,7 @@ from aplicacion.dtos.auditoria import (
 )
 from aplicacion.errores import ErrorAplicacion, ErrorConflictoArchivos, ErrorValidacion
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos
+from dominio.errores import ErrorValidacionDominio
 from dominio.especificacion import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
 
 
@@ -33,7 +39,35 @@ class _ContextoEjecucion:
     ruta_evidencias: Path
 
 
+@dataclass(frozen=True)
+class _ReglaBlueprint:
+    blueprint: str
+    regla: str
+    accion: str
+
+
+@dataclass(frozen=True)
+class _FalloEtapa:
+    tipo_fallo: str
+    codigo: str
+    mensaje_usuario: str
+    detalle_tecnico: str
+
+
 class AuditarFinalizacionProyecto:
+    _REGLAS_BLUEPRINTS: tuple[_ReglaBlueprint, ...] = (
+        _ReglaBlueprint(
+            blueprint="crud_json",
+            regla="requiere al menos 1 clase",
+            accion="añade al menos una clase en la especificación o elimina crud_json del preset",
+        ),
+        _ReglaBlueprint(
+            blueprint="crud_json",
+            regla="requiere entidad 'persona'",
+            accion="añade la clase Persona en la especificación o elimina crud_json del preset",
+        ),
+    )
+
     def __init__(
         self,
         crear_plan_desde_blueprints: CrearPlanDesdeBlueprints,
@@ -66,38 +100,42 @@ class AuditarFinalizacionProyecto:
         etapas.append(etapa_carga)
         evidencias["carga_preset"] = evidencia_carga
         if preset is None:
+            self._registrar_incidente_si_aplica(etapa_carga, evidencias, contexto.id_ejecucion)
             return DtoAuditoriaFinalizacionSalida(contexto.id_ejecucion, str(contexto.ruta_sandbox), etapas, None, evidencias)
 
-        conflicto_resultado, etapa_preflight, evidencia_preflight = self._medir_etapa(
-            lambda: self._preflight_conflictos(preset), "Preflight conflictos"
+        _, etapa_validacion, evidencia_validacion = self._medir_etapa(
+            lambda: self._preflight_validacion_entrada(preset), "Preflight validación entrada"
         )
-        etapas.append(etapa_preflight)
-        evidencias["preflight_conflictos"] = evidencia_preflight
-        if etapa_preflight.estado == "FAIL":
+        etapas.append(etapa_validacion)
+        evidencias["preflight_validacion_entrada"] = evidencia_validacion
+        if etapa_validacion.estado == "FAIL":
+            etapas.append(ResultadoEtapa("Preflight conflictos de rutas", "SKIP", 0, "No ejecutada por fallo de validación"))
+            evidencias.setdefault("preflight_conflictos_rutas", "No ejecutada")
+            self._anexar_etapas_skip(etapas, "fallo de validación")
+            self._completar_evidencias_skip(evidencias)
+            self._registrar_incidente_si_aplica(etapa_validacion, evidencias, contexto.id_ejecucion)
+            return DtoAuditoriaFinalizacionSalida(contexto.id_ejecucion, str(contexto.ruta_sandbox), etapas, None, evidencias)
+
+        conflicto_resultado, etapa_conflictos, evidencia_conflictos = self._medir_etapa(
+            lambda: self._preflight_conflictos_rutas(preset), "Preflight conflictos de rutas"
+        )
+        etapas.append(etapa_conflictos)
+        evidencias["preflight_conflictos_rutas"] = evidencia_conflictos
+        if etapa_conflictos.estado == "FAIL":
             conflictos = conflicto_resultado
-            motivo = "conflicto" if conflicto_resultado is not None else "fallo preflight"
-            etapas.extend(
-                [
-                    ResultadoEtapa("Generación sandbox", "SKIP", 0, f"No ejecutada por {motivo}"),
-                    ResultadoEtapa("Auditoría arquitectura", "SKIP", 0, f"No ejecutada por {motivo}"),
-                    ResultadoEtapa("Smoke test", "SKIP", 0, f"No ejecutada por {motivo}"),
-                ]
-            )
-            evidencias.setdefault("generacion_sandbox", "No ejecutada")
-            evidencias.setdefault("auditoria_arquitectura", "No ejecutada")
-            evidencias.setdefault("smoke_test", "No ejecutada")
-            if conflicto_resultado is None:
-                evidencias["incidente_id"] = contexto.id_ejecucion
+            self._anexar_etapas_skip(etapas, "conflicto de rutas")
+            self._completar_evidencias_skip(evidencias)
+            self._registrar_incidente_si_aplica(etapa_conflictos, evidencias, contexto.id_ejecucion)
             return DtoAuditoriaFinalizacionSalida(contexto.id_ejecucion, str(contexto.ruta_sandbox), etapas, conflictos, evidencias)
 
-        ruta_proyecto = contexto.ruta_sandbox / preset["especificacion"]["nombre_proyecto"]
+        ruta_proyecto = contexto.ruta_sandbox / str(preset["especificacion"]["nombre_proyecto"])
         _, etapa_generacion, evidencia_generacion = self._medir_etapa(
             lambda: self._generar_en_sandbox(preset, contexto.ruta_sandbox, ruta_proyecto), "Generación sandbox"
         )
         etapas.append(etapa_generacion)
         evidencias["generacion_sandbox"] = evidencia_generacion
         if etapa_generacion.estado == "FAIL":
-            evidencias["incidente_id"] = contexto.id_ejecucion
+            self._registrar_incidente_si_aplica(etapa_generacion, evidencias, contexto.id_ejecucion)
             etapas.extend(
                 [
                     ResultadoEtapa("Auditoría arquitectura", "SKIP", 0, "No ejecutada por fallo previo"),
@@ -135,23 +173,70 @@ class AuditarFinalizacionProyecto:
 
     def _medir_etapa(self, accion, nombre_etapa: str):  # type: ignore[no-untyped-def]
         inicio = time.perf_counter()
-        resultado, estado, resumen, evidencia = accion()
+        resultado, estado, resumen, evidencia, fallo = accion()
         duracion_ms = int((time.perf_counter() - inicio) * 1000)
-        return resultado, ResultadoEtapa(nombre_etapa, estado, duracion_ms, resumen), evidencia
+        etapa = ResultadoEtapa(
+            nombre=nombre_etapa,
+            estado=estado,
+            duracion_ms=duracion_ms,
+            resumen=resumen,
+            tipo_fallo=fallo.tipo_fallo if fallo else None,
+            codigo=fallo.codigo if fallo else None,
+            mensaje_usuario=fallo.mensaje_usuario if fallo else None,
+            detalle_tecnico=fallo.detalle_tecnico if fallo else None,
+        )
+        return resultado, etapa, evidencia
 
     def _cargar_preset(self, ruta_preset: str):  # type: ignore[no-untyped-def]
         try:
             datos = json.loads(Path(ruta_preset).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            return None, "FAIL", "No se pudo cargar preset", str(exc)
+            fallo = self._crear_fallo(exc=exc, codigo="IO-001", mensaje_usuario="No se pudo cargar el preset", tipo_forzado=IO)
+            return None, "FAIL", "No se pudo cargar preset", fallo.detalle_tecnico, fallo
 
         blueprints = datos.get("blueprints")
         especificacion = datos.get("especificacion")
         if not isinstance(blueprints, list) or not blueprints or not isinstance(especificacion, dict):
-            return None, "FAIL", "Preset inválido", "Falta especificación o blueprints"
-        return datos, "PASS", f"Blueprints: {len(blueprints)}", "\n".join(str(bp) for bp in blueprints)
+            exc = ErrorValidacion("Falta especificación o blueprints")
+            fallo = self._crear_fallo(
+                exc=exc,
+                codigo="VAL-000",
+                mensaje_usuario="El preset debe incluir especificación y al menos un blueprint",
+                tipo_forzado=VALIDACION,
+            )
+            return None, "FAIL", "Preset inválido", fallo.detalle_tecnico, fallo
+        return datos, "PASS", f"Blueprints: {len(blueprints)}", "\n".join(str(bp) for bp in blueprints), None
 
-    def _preflight_conflictos(self, preset: dict[str, object]):
+    def _preflight_validacion_entrada(self, preset: dict[str, object]):
+        especificacion = self._construir_especificacion(preset)
+        blueprints = [str(item) for item in preset["blueprints"]]
+        clases = list(especificacion.clases)
+
+        for regla in self._REGLAS_BLUEPRINTS:
+            if regla.blueprint not in blueprints:
+                continue
+            if regla.regla == "requiere al menos 1 clase" and not clases:
+                mensaje = (
+                    "crud_json requiere al menos una clase. "
+                    "Blueprint culpable: crud_json. Regla: requiere al menos 1 clase. "
+                    "Acción: añade al menos una clase en la especificación o elimina crud_json del preset"
+                )
+                exc = ErrorValidacionDominio("El blueprint crud_json requiere al menos una clase en la especificación.")
+                fallo = self._crear_fallo(exc=exc, codigo="VAL-001", mensaje_usuario=mensaje, tipo_forzado=VALIDACION)
+                return None, "FAIL", "Validación de blueprint fallida", fallo.detalle_tecnico, fallo
+            if regla.regla == "requiere entidad 'persona'" and clases and not self._existe_clase_persona(clases):
+                mensaje = (
+                    "crud_json requiere entidad persona. Blueprint culpable: crud_json. "
+                    "Regla: requiere entidad 'persona'. Acción: añade la clase Persona en la especificación "
+                    "o elimina crud_json del preset"
+                )
+                exc = ErrorValidacionDominio("El blueprint crud_json requiere entidad Persona.")
+                fallo = self._crear_fallo(exc=exc, codigo="VAL-002", mensaje_usuario=mensaje, tipo_forzado=VALIDACION)
+                return None, "FAIL", "Validación de blueprint fallida", fallo.detalle_tecnico, fallo
+
+        return None, "PASS", "Validación de entrada OK", "Reglas de blueprint satisfechas", None
+
+    def _preflight_conflictos_rutas(self, preset: dict[str, object]):
         especificacion = self._construir_especificacion(preset)
         blueprints = [str(item) for item in preset["blueprints"]]
         indice: dict[str, set[str]] = {}
@@ -159,16 +244,13 @@ class AuditarFinalizacionProyecto:
         for blueprint in blueprints:
             try:
                 plan_parcial = self._crear_plan_desde_blueprints.ejecutar(especificacion, [blueprint])
-            except (ErrorConflictoArchivos, ErrorValidacion) as exc:
-                return None, "FAIL", "Error en preflight", str(exc)
+            except Exception as exc:  # noqa: BLE001
+                fallo = self._crear_fallo(exc=exc, codigo="CON-000", mensaje_usuario="No se pudo construir el índice de rutas")
+                return None, "FAIL", "Error en preflight de conflictos", fallo.detalle_tecnico, fallo
             for ruta in plan_parcial.obtener_rutas():
                 indice.setdefault(ruta, set()).add(blueprint)
 
-        mapeo_conflictos = {
-            ruta: sorted(list(duenios))
-            for ruta, duenios in indice.items()
-            if len(duenios) > 1
-        }
+        mapeo_conflictos = {ruta: sorted(list(duenios)) for ruta, duenios in indice.items() if len(duenios) > 1}
         if mapeo_conflictos:
             rutas = sorted(mapeo_conflictos.keys())
             conflicto = ConflictosFinalizacion(
@@ -177,14 +259,22 @@ class AuditarFinalizacionProyecto:
                 rutas_por_blueprint=mapeo_conflictos,
             )
             top = "\n".join(f"{ruta} -> [{', '.join(mapeo_conflictos[ruta])}]" for ruta in rutas[:5])
+            mensaje_usuario = (
+                "Se detectaron rutas duplicadas entre blueprints. "
+                "Acción: desactiva uno de los blueprints que generan la misma ruta "
+                "(p.ej. CRUD persona duplicado)"
+            )
+            exc = ErrorConflictoArchivos(f"Rutas duplicadas detectadas: {len(rutas)}")
+            fallo = self._crear_fallo(exc=exc, codigo="CON-001", mensaje_usuario=mensaje_usuario, tipo_forzado=CONFLICTO)
             evidencia = (
                 f"Total rutas duplicadas: {len(rutas)}\n"
-                f"Primeras rutas: {', '.join(rutas[:5])}\n"
-                f"Blueprints implicados:\n{top}"
+                "Ejemplos ruta -> [blueprints]:\n"
+                f"{top}\n\n"
+                f"{fallo.detalle_tecnico}"
             )
-            return conflicto, "FAIL", "Rutas duplicadas detectadas", evidencia
+            return conflicto, "FAIL", "Rutas duplicadas detectadas", evidencia, fallo
 
-        return None, "PASS", "Sin colisiones entre blueprints", "Sin rutas duplicadas"
+        return None, "PASS", "Sin colisiones entre blueprints", "Sin rutas duplicadas", None
 
     def _generar_en_sandbox(self, preset: dict[str, object], ruta_sandbox: Path, ruta_proyecto: Path):
         especificacion = self._construir_especificacion(preset)
@@ -197,22 +287,29 @@ class AuditarFinalizacionProyecto:
         try:
             self._generar_proyecto_mvp.ejecutar(entrada)
         except (OSError, ErrorAplicacion) as exc:
-            traza = traceback.format_exc()
-            return None, "FAIL", "Falló generación en sandbox", f"{exc}\n{traza}"
+            fallo = self._crear_fallo(exc=exc, codigo="IO-002", mensaje_usuario="Falló la generación del proyecto en sandbox")
+            return None, "FAIL", "Falló generación en sandbox", fallo.detalle_tecnico, fallo
 
         manifest = ruta_proyecto / "manifest.json"
         if not manifest.exists():
-            return None, "FAIL", "manifest.json ausente", str(manifest)
+            exc = ErrorConflictoArchivos(f"manifest.json ausente: {manifest}")
+            fallo = self._crear_fallo(exc=exc, codigo="CON-002", mensaje_usuario="No se generó manifest.json")
+            return None, "FAIL", "manifest.json ausente", fallo.detalle_tecnico, fallo
 
         top_level = sorted([ruta.name for ruta in ruta_proyecto.iterdir()])
         evidencia = f"Top-level creado: {', '.join(top_level)}\nManifest: {manifest}"
-        return None, "PASS", "Proyecto generado", evidencia
+        return None, "PASS", "Proyecto generado", evidencia, None
 
     def _auditar_arquitectura(self, ruta_proyecto: Path):
         resultado = self._auditor_arquitectura.auditar(str(ruta_proyecto))
         hallazgos = list(resultado.errores) + list(resultado.warnings)
         evidencia = "\n".join(hallazgos[:5]) if hallazgos else "Sin hallazgos"
-        return None, ("PASS" if resultado.valido else "FAIL"), f"Hallazgos: {len(hallazgos)}", evidencia
+        estado = "PASS" if resultado.valido else "FAIL"
+        if estado == "FAIL":
+            exc = ErrorAplicacion("La auditoría de arquitectura encontró hallazgos")
+            fallo = self._crear_fallo(exc=exc, codigo="VAL-900", mensaje_usuario="Corrige hallazgos de arquitectura antes de continuar")
+            return None, estado, f"Hallazgos: {len(hallazgos)}", f"{evidencia}\n\n{fallo.detalle_tecnico}", fallo
+        return None, estado, f"Hallazgos: {len(hallazgos)}", evidencia, None
 
     def _smoke_test(self, ruta_proyecto: Path):
         compileall = self._ejecutor_procesos.ejecutar(["python", "-m", "compileall", "."], cwd=str(ruta_proyecto))
@@ -221,18 +318,24 @@ class AuditarFinalizacionProyecto:
             (compileall.stdout or compileall.stderr)[:1000],
         ]
         if compileall.codigo_salida != 0:
-            return None, "FAIL", "compileall falló", "\n".join(evidencia)
+            exc = OSError("compileall falló")
+            fallo = self._crear_fallo(exc=exc, codigo="IO-010", mensaje_usuario="El código generado no compila correctamente")
+            evidencia.append(fallo.detalle_tecnico)
+            return None, "FAIL", "compileall falló", "\n".join(evidencia), fallo
 
         hay_tests = (ruta_proyecto / "pytest.ini").exists() or (ruta_proyecto / "tests").exists()
         if not hay_tests:
             evidencia.append("pytest SKIP (sin tests)")
-            return None, "SKIP", "Sin tests generados", "\n".join(evidencia)
+            return None, "SKIP", "Sin tests generados", "\n".join(evidencia), None
 
         pytest_res = self._ejecutor_procesos.ejecutar(["pytest", "-q", "--maxfail=1"], cwd=str(ruta_proyecto))
         evidencia.extend([f"pytest exit={pytest_res.codigo_salida}", (pytest_res.stdout or pytest_res.stderr)[:1000]])
         if pytest_res.codigo_salida != 0:
-            return None, "FAIL", "pytest falló", "\n".join(evidencia)
-        return None, "PASS", "compileall y pytest OK", "\n".join(evidencia)
+            exc = ErrorAplicacion("pytest falló")
+            fallo = self._crear_fallo(exc=exc, codigo="VAL-901", mensaje_usuario="Revisa los tests generados y corrige el blueprint")
+            evidencia.append(fallo.detalle_tecnico)
+            return None, "FAIL", "pytest falló", "\n".join(evidencia), fallo
+        return None, "PASS", "compileall y pytest OK", "\n".join(evidencia), None
 
     def _construir_especificacion(self, preset: dict[str, object]) -> EspecificacionProyecto:
         datos = preset["especificacion"]
@@ -260,3 +363,61 @@ class AuditarFinalizacionProyecto:
             ruta_destino=str(Path(tempfile.gettempdir())),
             clases=clases,
         )
+
+    def _existe_clase_persona(self, clases: list[EspecificacionClase]) -> bool:
+        return any(clase.nombre.casefold() == "persona" for clase in clases)
+
+    def _crear_fallo(self, exc: Exception, codigo: str, mensaje_usuario: str, tipo_forzado: str | None = None) -> _FalloEtapa:
+        tipo = tipo_forzado or self._clasificar_fallo(exc)
+        detalle = self._detalle_tecnico(exc)
+        return _FalloEtapa(tipo_fallo=tipo, codigo=codigo, mensaje_usuario=mensaje_usuario, detalle_tecnico=detalle)
+
+    def _clasificar_fallo(self, exc: Exception) -> str:
+        if isinstance(exc, (ErrorValidacion, ErrorValidacionDominio)):
+            return VALIDACION
+        if isinstance(exc, ErrorConflictoArchivos):
+            return CONFLICTO
+        if isinstance(exc, OSError):
+            return IO
+        return INESPERADO
+
+    def _detalle_tecnico(self, exc: Exception) -> str:
+        origen = self._origen_excepcion(exc.__traceback__)
+        stack = traceback.format_exception(type(exc), exc, exc.__traceback__)
+        stack_lineas = "".join(stack).splitlines()[:60]
+        stacktrace = "\n".join(stack_lineas)
+        return (
+            f"excepcion_tipo: {type(exc).__name__}\n"
+            f"excepcion_mensaje: {exc}\n"
+            f"origen: {origen}\n"
+            f"stacktrace_recortado:\n{stacktrace}"
+        )
+
+    def _origen_excepcion(self, traza: TracebackType | None) -> str:
+        if traza is None:
+            return "N/D"
+        resumen = traceback.extract_tb(traza)
+        if not resumen:
+            return "N/D"
+        final = resumen[-1]
+        return f"{Path(final.filename).name}:{final.name}:{final.lineno}"
+
+    def _anexar_etapas_skip(self, etapas: list[ResultadoEtapa], motivo: str) -> None:
+        etapas.extend(
+            [
+                ResultadoEtapa("Generación sandbox", "SKIP", 0, f"No ejecutada por {motivo}"),
+                ResultadoEtapa("Auditoría arquitectura", "SKIP", 0, f"No ejecutada por {motivo}"),
+                ResultadoEtapa("Smoke test", "SKIP", 0, f"No ejecutada por {motivo}"),
+            ]
+        )
+
+    def _completar_evidencias_skip(self, evidencias: dict[str, str]) -> None:
+        evidencias.setdefault("generacion_sandbox", "No ejecutada")
+        evidencias.setdefault("auditoria_arquitectura", "No ejecutada")
+        evidencias.setdefault("smoke_test", "No ejecutada")
+
+    def _registrar_incidente_si_aplica(self, etapa: ResultadoEtapa, evidencias: dict[str, str], id_ejecucion: str) -> None:
+        if etapa.estado != "FAIL":
+            return
+        if etapa.tipo_fallo == INESPERADO:
+            evidencias["incidente_id"] = id_ejecucion
