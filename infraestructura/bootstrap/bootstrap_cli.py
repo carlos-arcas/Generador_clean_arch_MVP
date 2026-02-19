@@ -15,6 +15,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyecto
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
 from aplicacion.casos_uso.presets import CargarPresetProyecto
 from infraestructura.manifest.generador_manifest import GeneradorManifest
+from infraestructura.planificador_blueprints_real import PlanificadorBlueprintsReal
 
 from .bootstrap_base import _construir_puertos_infraestructura, _construir_repositorios_infraestructura
 
@@ -73,7 +74,7 @@ def construir_contenedor_cli() -> ContenedorCli:
         ),
         auditar_proyecto=auditor_proyecto,
         auditar_finalizacion_proyecto=AuditarFinalizacionProyecto(
-            crear_plan_desde_blueprints=crear_plan_desde_blueprints,
+            planificador_blueprints=PlanificadorBlueprintsReal(crear_plan_desde_blueprints),
             generar_proyecto_mvp=GenerarProyectoMvp(
                 crear_plan_desde_blueprints=crear_plan_desde_blueprints,
                 ejecutar_plan=ejecutar_plan,

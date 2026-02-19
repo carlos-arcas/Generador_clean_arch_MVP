@@ -39,6 +39,9 @@ def construir_parser() -> argparse.ArgumentParser:
     )
     auditar_finalizacion.add_argument("--preset", required=True, help="Ruta del preset en disco")
     auditar_finalizacion.add_argument("--sandbox", required=True, help="Ruta sandbox de auditoría")
+    auditar_finalizacion.add_argument("--evidencias", default="docs/evidencias_finalizacion", help="Ruta base para evidencias")
+    auditar_finalizacion.add_argument("--smoke", action="store_true", help="Ejecuta smoke test")
+    auditar_finalizacion.add_argument("--arquitectura", action="store_true", help="Ejecuta auditoría arquitectura")
 
     return parser
 

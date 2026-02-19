@@ -47,6 +47,9 @@ def test_parser_auditar_finalizacion_reconoce_argumentos() -> None:
         comando="auditar-finalizacion",
         preset="configuracion/presets/api_basica.json",
         sandbox="tmp/auditoria",
+        evidencias="docs/evidencias_finalizacion",
+        smoke=False,
+        arquitectura=False,
     )
 
 def test_main_invoca_comando_generar(monkeypatch) -> None:
