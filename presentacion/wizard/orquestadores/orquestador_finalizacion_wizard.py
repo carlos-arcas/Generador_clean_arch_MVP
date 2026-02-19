@@ -7,6 +7,12 @@ import logging
 from typing import Any, Callable
 
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvpEntrada
+from aplicacion.errores import (
+    ErrorAuditoria,
+    ErrorGeneracionProyecto,
+    ErrorInfraestructura,
+    ErrorValidacionEntrada,
+)
 from presentacion.wizard.dtos import DatosWizardProyecto
 
 LOGGER = logging.getLogger(__name__)
@@ -72,10 +78,11 @@ class OrquestadorFinalizacionWizard:
                     tipo=dto.datos_wizard.persistencia,
                 )
                 detalles["credencial_guardada"] = True
-            except Exception as exc:  # noqa: BLE001
+            except (ErrorInfraestructura, OSError, PermissionError, IOError, ValueError) as exc:
                 LOGGER.warning(
                     "No se pudo persistir credencial en almacenamiento seguro. Se continuará solo en memoria. %s",
                     exc,
+                    exc_info=True,
                 )
                 detalles["advertencia_credenciales"] = (
                     "No se pudo guardar la credencial en el sistema seguro. "
@@ -87,10 +94,17 @@ class OrquestadorFinalizacionWizard:
 
         try:
             especificacion = self._validador_final(dto.datos_wizard.proyecto)
-        except Exception as exc:  # noqa: BLE001
+        except (ErrorValidacionEntrada, ValueError, TypeError) as exc:
             return DtoResultadoFinalizacionWizard(
                 exito=False,
                 mensaje_usuario=f"Error de validación: {exc}",
+                detalles=detalles or None,
+            )
+        except ErrorInfraestructura as exc:
+            LOGGER.error("Error técnico durante validación final del wizard.", exc_info=True)
+            return DtoResultadoFinalizacionWizard(
+                exito=False,
+                mensaje_usuario="Error técnico durante la validación final.",
                 detalles=detalles or None,
             )
 
@@ -103,10 +117,17 @@ class OrquestadorFinalizacionWizard:
 
         try:
             self._lanzador_generacion(entrada_generacion)
-        except Exception as exc:  # noqa: BLE001
+        except (ErrorGeneracionProyecto, ErrorAuditoria, ValueError) as exc:
             return DtoResultadoFinalizacionWizard(
                 exito=False,
                 mensaje_usuario=f"Error al iniciar generación: {exc}",
+                detalles=detalles or None,
+            )
+        except (ErrorInfraestructura, OSError, PermissionError, IOError) as exc:
+            LOGGER.error("Error técnico al iniciar la generación del proyecto.", exc_info=True)
+            return DtoResultadoFinalizacionWizard(
+                exito=False,
+                mensaje_usuario="Error técnico al iniciar generación.",
                 detalles=detalles or None,
             )
 
