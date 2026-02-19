@@ -7,7 +7,7 @@ import re
 PATRON_IMPORT = re.compile(r"^\s*import\s+([\w\.]+)")
 PATRON_FROM = re.compile(r"^\s*from\s+([\w\.]+)\s+import\b")
 DIRECTORIOS_IGNORADOS = {"tests", ".venv", "__pycache__"}
-ARCHIVO_IGNORADO = Path("infraestructura/bootstrap.py")
+ARCHIVO_IGNORADO = Path("infraestructura/bootstrap/__init__.py")
 EXCEPCIONES_TEMPORALES = {
     Path("presentacion/wizard_proyecto.py"),
     Path("aplicacion/casos_uso/crear_plan_desde_blueprints.py"),
@@ -60,7 +60,7 @@ def _es_import_infraestructura_prohibido(linea: str) -> bool:
     modulo = _extraer_modulo_importado(linea)
     if not modulo:
         return False
-    if modulo == "infraestructura.bootstrap":
+    if modulo == "infraestructura.bootstrap" or modulo.startswith("infraestructura.bootstrap."):
         return False
     return modulo == "infraestructura" or modulo.startswith("infraestructura.")
 
@@ -113,7 +113,7 @@ def _analizar_archivo(raiz: Path, archivo: Path) -> list[ViolacionArquitectura]:
                         linea=linea,
                         regla=(
                             "Regla 3 violada "
-                            "(presentacion no puede depender de infraestructura salvo infraestructura.bootstrap)"
+                            "(presentacion no puede depender de infraestructura salvo infraestructura.bootstrap y submódulos)"
                         ),
                     )
                 )

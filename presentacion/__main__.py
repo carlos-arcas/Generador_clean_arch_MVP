@@ -7,7 +7,8 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from infraestructura.bootstrap import configurar_logging, construir_contenedor_aplicacion
+from infraestructura.bootstrap import configurar_logging
+from infraestructura.bootstrap.bootstrap_gui import construir_contenedor_gui
 from presentacion.wizard.wizard_generador import WizardGeneradorProyectos
 
 LOGGER = logging.getLogger(__name__)
@@ -23,14 +24,14 @@ def main() -> int:
     sys.excepthook = _capturar_excepciones_qt
 
     LOGGER.info("Inicializando aplicación PySide6 en modo wizard")
-    contenedor = construir_contenedor_aplicacion()
+    contenedor = construir_contenedor_gui()
     app = QApplication(sys.argv)
     wizard = WizardGeneradorProyectos(
         generar_proyecto=contenedor.generar_proyecto_mvp,
         guardar_preset=contenedor.guardar_preset_proyecto,
         cargar_preset=contenedor.cargar_preset_proyecto,
         guardar_credencial=contenedor.guardar_credencial,
-        catalogo_blueprints=contenedor.catalogo_blueprints,
+        catalogo_blueprints=contenedor.consultar_catalogo_blueprints.ejecutar(),
     )
     wizard.show()
     return app.exec()
