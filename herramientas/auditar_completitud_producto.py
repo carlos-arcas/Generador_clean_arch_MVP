@@ -698,6 +698,24 @@ def _renderizar_informe(resultado: ResultadoAuditoria) -> str:
     lineas.append("- `pytest -q --maxfail=1`")
     lineas.append("")
 
+    lineas.append("## 5.1) Evidencias de ejecución")
+    lineas.append("")
+    lineas.append("### `pytest -q --maxfail=1`")
+    lineas.append("```text")
+    lineas.extend(_leer_evidencia_recortada(resultado.ruta_repo, "pytest_q.txt"))
+    lineas.append("```")
+    lineas.append("")
+    lineas.append("### `pytest --cov=. --cov-report=term-missing --cov-fail-under=85`")
+    lineas.append("```text")
+    lineas.extend(_leer_evidencia_recortada(resultado.ruta_repo, "coverage.txt"))
+    lineas.append("```")
+    lineas.append("")
+    lineas.append("### `python -m herramientas.auditar_completitud_producto` (resumen)")
+    lineas.append("```text")
+    lineas.extend(_leer_evidencia_recortada(resultado.ruta_repo, "auditor.txt"))
+    lineas.append("```")
+    lineas.append("")
+
     lineas.append("## 6) Definición de DONE para 100%")
     lineas.append("- [ ] Secciones A-E en PASS y sin faltantes P0.")
     lineas.append("- [ ] Cobertura configurada y umbral >= 85% en scripts y guía.")
@@ -706,6 +724,16 @@ def _renderizar_informe(resultado: ResultadoAuditoria) -> str:
     lineas.append("- [ ] UX mínima con mapeo de errores y mensajes accionables.")
 
     return "\n".join(lineas) + "\n"
+
+
+def _leer_evidencia_recortada(ruta_repo: Path, nombre_archivo: str) -> list[str]:
+    ruta = ruta_repo / "docs" / "evidencias" / nombre_archivo
+    if not ruta.exists():
+        return [f"Evidencia no disponible todavía. Ejecutar: `python -m herramientas.capturar_evidencias`."]
+    lineas = ruta.read_text(encoding="utf-8").splitlines()
+    if len(lineas) <= 80:
+        return lineas if lineas else ["(sin contenido)"]
+    return lineas[:60] + ["...", f"(recortado, total de líneas: {len(lineas)})"] + lineas[-20:]
 
 
 def _resolver_raiz_repo() -> Path:
