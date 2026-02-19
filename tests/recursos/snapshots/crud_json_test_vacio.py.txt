@@ -1,0 +1,47 @@
+import pytest
+
+from dominio.entidades.vacio import Vacio
+from infraestructura.persistencia.json.repositorio_vacio_json import RepositorioVacioJson
+
+
+def test_crear_ok(tmp_path) -> None:
+    repo = RepositorioVacioJson(str(tmp_path))
+
+    creado = repo.crear(Vacio(id=0))
+
+    assert creado.id == 1
+    assert creado.id == 1
+
+
+def test_obtener_inexistente_error(tmp_path) -> None:
+    repo = RepositorioVacioJson(str(tmp_path))
+
+    with pytest.raises(ValueError, match="no encontrado"):
+        repo.obtener_por_id(404)
+
+
+def test_actualizar(tmp_path) -> None:
+    repo = RepositorioVacioJson(str(tmp_path))
+    creado = repo.crear(Vacio(id=0))
+
+    actualizado = repo.actualizar(
+        Vacio(id=creado.id)
+    )
+
+    assert actualizado.id == creado.id
+
+
+def test_eliminar(tmp_path) -> None:
+    repo = RepositorioVacioJson(str(tmp_path))
+    creado = repo.crear(Vacio(id=0))
+
+    repo.eliminar(creado.id)
+
+    with pytest.raises(ValueError, match="no encontrado"):
+        repo.obtener_por_id(creado.id)
+
+
+def test_listar_vacio_y_borde(tmp_path) -> None:
+    repo = RepositorioVacioJson(str(tmp_path))
+
+    assert repo.listar() == []

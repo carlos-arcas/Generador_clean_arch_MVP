@@ -434,56 +434,70 @@ class CrudJsonBlueprint(Blueprint):
         )
 
     def _contenido_test_crud(self, clase: EspecificacionClase, nombres: NombresClase) -> str:
-        atributos = self._atributos_sin_id(clase)
+        kwargs_crear = self._generar_kwargs_test(clase)
+        kwargs_actualizar = self._generar_kwargs_test(clase, "_upd")
+        assert_crear, assert_actualizar = self._generar_asserts_test(clase)
 
-        def _valor(tipo_original: str, sufijo: str = "") -> str:
-            tipo = self._tipo_python(tipo_original)
-            if tipo == "str":
-                return f'"valor{sufijo}"'
-            if tipo == "int":
-                return f"{10 if not sufijo else 20}"
-            if tipo == "float":
-                return f"{10.5 if not sufijo else 20.5}"
-            if tipo == "bool":
-                return "True" if not sufijo else "False"
+        partes = [
+            self._generar_imports_test(nombres),
+            self._generar_fixture_test(),
+            self._generar_test_create(nombres, kwargs_crear, assert_crear),
+            self._generar_test_read(nombres),
+            self._generar_test_update(nombres, kwargs_crear, kwargs_actualizar, assert_actualizar),
+            self._generar_test_delete(nombres, kwargs_crear),
+            self._generar_utilidades_test(nombres),
+        ]
+        return "\n\n".join(parte for parte in partes if parte)
+
+    def _valor_test(self, tipo_original: str, sufijo: str = "") -> str:
+        tipo = self._tipo_python(tipo_original)
+        if tipo == "str":
             return f'"valor{sufijo}"'
+        if tipo == "int":
+            return f"{10 if not sufijo else 20}"
+        if tipo == "float":
+            return f"{10.5 if not sufijo else 20.5}"
+        if tipo == "bool":
+            return "True" if not sufijo else "False"
+        return f'"valor{sufijo}"'
 
-        kwargs_crear = ", ".join(
-            f"{atributo.nombre}={_valor(atributo.tipo)}"
+    def _generar_kwargs_test(self, clase: EspecificacionClase, sufijo: str = "") -> str:
+        return ", ".join(
+            f"{atributo.nombre}={self._valor_test(atributo.tipo, sufijo)}"
             for atributo in clase.atributos
             if atributo.nombre != "id"
         )
-        kwargs_actualizar = ", ".join(
-            f"{atributo.nombre}={_valor(atributo.tipo, '_upd')}"
-            for atributo in clase.atributos
-            if atributo.nombre != "id"
-        )
 
+    def _generar_asserts_test(self, clase: EspecificacionClase) -> tuple[str, str]:
         primer = next((a for a in clase.atributos if a.nombre != "id"), None)
         if primer is None:
-            assert_crear = "    assert creado.id == 1"
-            assert_actualizar = "    assert actualizado.id == creado.id"
-        elif self._tipo_python(primer.tipo) == "str":
-            assert_crear = f"    assert creado.{primer.nombre} == \"valor\""
-            assert_actualizar = f"    assert actualizado.{primer.nombre} == \"valor_upd\""
-        elif self._tipo_python(primer.tipo) == "int":
-            assert_crear = f"    assert creado.{primer.nombre} == 10"
-            assert_actualizar = f"    assert actualizado.{primer.nombre} == 20"
-        elif self._tipo_python(primer.tipo) == "float":
-            assert_crear = f"    assert creado.{primer.nombre} == 10.5"
-            assert_actualizar = f"    assert actualizado.{primer.nombre} == 20.5"
-        else:
-            assert_crear = f"    assert creado.{primer.nombre} is True"
-            assert_actualizar = f"    assert actualizado.{primer.nombre} is False"
+            return "    assert creado.id == 1", "    assert actualizado.id == creado.id"
 
+        tipo_primer = self._tipo_python(primer.tipo)
+        if tipo_primer == "str":
+            return f"    assert creado.{primer.nombre} == \"valor\"", f"    assert actualizado.{primer.nombre} == \"valor_upd\""
+        if tipo_primer == "int":
+            return f"    assert creado.{primer.nombre} == 10", f"    assert actualizado.{primer.nombre} == 20"
+        if tipo_primer == "float":
+            return f"    assert creado.{primer.nombre} == 10.5", f"    assert actualizado.{primer.nombre} == 20.5"
+        return f"    assert creado.{primer.nombre} is True", f"    assert actualizado.{primer.nombre} is False"
+
+    def _generar_imports_test(self, nombres: NombresClase) -> str:
         return textwrap.dedent(
             f'''\
             import pytest
 
             from dominio.entidades.{nombres.nombre_snake} import {nombres.nombre_clase}
             from infraestructura.persistencia.json.repositorio_{nombres.nombre_snake}_json import Repositorio{nombres.nombre_clase}Json
+            '''
+        )
 
+    def _generar_fixture_test(self) -> str:
+        return ""
 
+    def _generar_test_create(self, nombres: NombresClase, kwargs_crear: str, assert_crear: str) -> str:
+        return textwrap.dedent(
+            f'''\
             def test_crear_ok(tmp_path) -> None:
                 repo = Repositorio{nombres.nombre_clase}Json(str(tmp_path))
 
@@ -491,15 +505,29 @@ class CrudJsonBlueprint(Blueprint):
 
                 assert creado.id == 1
             {assert_crear}
+            '''
+        )
 
-
+    def _generar_test_read(self, nombres: NombresClase) -> str:
+        return textwrap.dedent(
+            f'''\
             def test_obtener_inexistente_error(tmp_path) -> None:
                 repo = Repositorio{nombres.nombre_clase}Json(str(tmp_path))
 
                 with pytest.raises(ValueError, match="no encontrado"):
                     repo.obtener_por_id(404)
+            '''
+        )
 
-
+    def _generar_test_update(
+        self,
+        nombres: NombresClase,
+        kwargs_crear: str,
+        kwargs_actualizar: str,
+        assert_actualizar: str,
+    ) -> str:
+        return textwrap.dedent(
+            f'''\
             def test_actualizar(tmp_path) -> None:
                 repo = Repositorio{nombres.nombre_clase}Json(str(tmp_path))
                 creado = repo.crear({nombres.nombre_clase}(id=0{', ' + kwargs_crear if kwargs_crear else ''}))
@@ -509,8 +537,12 @@ class CrudJsonBlueprint(Blueprint):
                 )
 
             {assert_actualizar}
+            '''
+        )
 
-
+    def _generar_test_delete(self, nombres: NombresClase, kwargs_crear: str) -> str:
+        return textwrap.dedent(
+            f'''\
             def test_eliminar(tmp_path) -> None:
                 repo = Repositorio{nombres.nombre_clase}Json(str(tmp_path))
                 creado = repo.crear({nombres.nombre_clase}(id=0{', ' + kwargs_crear if kwargs_crear else ''}))
@@ -519,8 +551,12 @@ class CrudJsonBlueprint(Blueprint):
 
                 with pytest.raises(ValueError, match="no encontrado"):
                     repo.obtener_por_id(creado.id)
+            '''
+        )
 
-
+    def _generar_utilidades_test(self, nombres: NombresClase) -> str:
+        return textwrap.dedent(
+            f'''\
             def test_listar_vacio_y_borde(tmp_path) -> None:
                 repo = Repositorio{nombres.nombre_clase}Json(str(tmp_path))
 
