@@ -32,21 +32,20 @@ class PaginaClases(QWizardPage):
 
     def __init__(self) -> None:
         super().__init__()
+        self._crear_widgets()
+        self._configurar_layout()
+        self._configurar_modelos()
+        self._conectar_senales()
+        self._inicializar_estado()
+
+    def _crear_widgets(self) -> None:
         self.setTitle("Clases")
         self.setSubTitle("Añade clases y sus atributos iniciales.")
-        self._clases_dto: list[DtoClase] = []
-
         self._campo_nombre_clase = QLineEdit()
         self._campo_nombre_clase.setPlaceholderText("Nombre de clase")
-
         self._lista_clases = QListWidget()
-        self._lista_clases.currentRowChanged.connect(self._al_cambiar_clase_seleccionada)
-
-        boton_anadir_clase = QPushButton("Añadir clase")
-        boton_anadir_clase.clicked.connect(self.anadir_clase_desde_input)
-
-        boton_eliminar_clase = QPushButton("Eliminar clase")
-        boton_eliminar_clase.clicked.connect(self.eliminar_clase_seleccionada)
+        self._boton_anadir_clase = QPushButton("Añadir clase")
+        self._boton_eliminar_clase = QPushButton("Eliminar clase")
 
         self._tabla_atributos = QTableWidget(0, 3)
         self._tabla_atributos.setHorizontalHeaderLabels(["Nombre", "Tipo", "Obligatorio"])
@@ -54,30 +53,34 @@ class PaginaClases(QWizardPage):
         self._tabla_atributos.setEditTriggers(QTableWidget.NoEditTriggers)
         self._tabla_atributos.setSelectionBehavior(QTableWidget.SelectRows)
         self._tabla_atributos.setSelectionMode(QTableWidget.SingleSelection)
-
         self._campo_nombre_atributo = QLineEdit()
         self._campo_nombre_atributo.setPlaceholderText("Nombre de atributo")
-
         self._combo_tipo_atributo = QComboBox()
         self._combo_tipo_atributo.addItems(self.TIPOS_ATRIBUTO)
-
         self._checkbox_obligatorio = QCheckBox("Obligatorio")
+        self._boton_anadir_atributo = QPushButton("Añadir atributo")
+        self._boton_eliminar_atributo = QPushButton("Eliminar atributo")
 
-        boton_anadir_atributo = QPushButton("Añadir atributo")
-        boton_anadir_atributo.clicked.connect(self.anadir_atributo_desde_input)
+    def _configurar_layout(self) -> None:
+        panel_izquierdo = self._construir_panel_clases()
+        panel_derecho = self._construir_panel_atributos()
 
-        boton_eliminar_atributo = QPushButton("Eliminar atributo")
-        boton_eliminar_atributo.clicked.connect(self.eliminar_atributo_seleccionado)
+        layout_principal = QHBoxLayout(self)
+        layout_principal.addLayout(panel_izquierdo)
+        layout_principal.addLayout(panel_derecho)
 
+    def _construir_panel_clases(self) -> QVBoxLayout:
         panel_izquierdo = QVBoxLayout()
         panel_izquierdo.addWidget(self._lista_clases)
 
         fila_controles_clase = QHBoxLayout()
         fila_controles_clase.addWidget(self._campo_nombre_clase)
-        fila_controles_clase.addWidget(boton_anadir_clase)
+        fila_controles_clase.addWidget(self._boton_anadir_clase)
         panel_izquierdo.addLayout(fila_controles_clase)
-        panel_izquierdo.addWidget(boton_eliminar_clase)
+        panel_izquierdo.addWidget(self._boton_eliminar_clase)
+        return panel_izquierdo
 
+    def _construir_panel_atributos(self) -> QVBoxLayout:
         panel_derecho = QVBoxLayout()
         panel_derecho.addWidget(self._tabla_atributos)
 
@@ -85,21 +88,29 @@ class PaginaClases(QWizardPage):
         fila_controles_atributo.addWidget(self._campo_nombre_atributo)
         fila_controles_atributo.addWidget(self._combo_tipo_atributo)
         fila_controles_atributo.addWidget(self._checkbox_obligatorio)
-        fila_controles_atributo.addWidget(boton_anadir_atributo)
+        fila_controles_atributo.addWidget(self._boton_anadir_atributo)
         panel_derecho.addLayout(fila_controles_atributo)
-        panel_derecho.addWidget(boton_eliminar_atributo)
+        panel_derecho.addWidget(self._boton_eliminar_atributo)
+        return panel_derecho
 
-        layout_principal = QHBoxLayout(self)
-        layout_principal.addLayout(panel_izquierdo)
-        layout_principal.addLayout(panel_derecho)
+    def _configurar_modelos(self) -> None:
+        self._clases_dto: list[DtoClase] = []
 
+    def _conectar_senales(self) -> None:
+        self._lista_clases.currentRowChanged.connect(self._al_cambiar_clase_seleccionada)
+        self._boton_anadir_clase.clicked.connect(self.anadir_clase_desde_input)
+        self._boton_eliminar_clase.clicked.connect(self.eliminar_clase_seleccionada)
+        self._boton_anadir_atributo.clicked.connect(self.anadir_atributo_desde_input)
+        self._boton_eliminar_atributo.clicked.connect(self.eliminar_atributo_seleccionado)
+
+    def _inicializar_estado(self) -> None:
         self._widgets_panel_atributos = [
             self._tabla_atributos,
             self._campo_nombre_atributo,
             self._combo_tipo_atributo,
             self._checkbox_obligatorio,
-            boton_anadir_atributo,
-            boton_eliminar_atributo,
+            self._boton_anadir_atributo,
+            self._boton_eliminar_atributo,
         ]
         self._actualizar_estado_panel_atributos(False)
         self._estado_complete = self._calcular_estado_complete_ui()
