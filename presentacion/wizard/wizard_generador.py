@@ -80,18 +80,44 @@ class WizardGeneradorProyectos(QWizard):
     ) -> None:
         super().__init__()
         self.setWindowTitle("Generador Base Proyectos")
+        self._configurar_dependencias(
+            controlador=controlador,
+            generar_proyecto=generar_proyecto,
+            generador_mvp=generador_mvp,
+            guardar_preset=guardar_preset,
+            cargar_preset=cargar_preset,
+            guardar_credencial=guardar_credencial,
+            catalogo_blueprints=catalogo_blueprints,
+            orquestador_finalizacion=orquestador_finalizacion,
+        )
+        self._crear_widgets()
+        self._configurar_paginas()
+        self._configurar_layout()
+        self._configurar_botones()
+        self._conectar_senales()
+        self._inicializar_estado()
 
+    def _configurar_dependencias(
+        self,
+        controlador: ControladorWizardProyecto | None,
+        generar_proyecto: GenerarProyectoMvp | None,
+        generador_mvp: GenerarProyectoMvp | None,
+        guardar_preset: GuardarPresetProyecto | None,
+        cargar_preset: CargarPresetProyecto | None,
+        guardar_credencial: GuardarCredencial | None,
+        catalogo_blueprints: list[tuple[str, str, str]] | None,
+        orquestador_finalizacion: OrquestadorFinalizacionWizard | None,
+    ) -> None:
         if generar_proyecto is None and generador_mvp is not None:
             generar_proyecto = generador_mvp
 
-        dependencias_faltantes = (
-            generar_proyecto is None
-            or guardar_preset is None
-            or cargar_preset is None
-            or guardar_credencial is None
-            or catalogo_blueprints is None
-        )
-        if dependencias_faltantes:
+        if self._dependencias_faltantes(
+            generar_proyecto=generar_proyecto,
+            guardar_preset=guardar_preset,
+            cargar_preset=cargar_preset,
+            guardar_credencial=guardar_credencial,
+            catalogo_blueprints=catalogo_blueprints,
+        ):
             raise ValueError(
                 "El wizard requiere casos de uso inyectados. "
                 "Construye las dependencias con infraestructura.bootstrap.bootstrap_gui.construir_contenedor_gui()."
@@ -112,30 +138,52 @@ class WizardGeneradorProyectos(QWizard):
             servicio_credenciales=self._guardar_credencial,
         )
 
+    def _dependencias_faltantes(
+        self,
+        generar_proyecto: GenerarProyectoMvp | None,
+        guardar_preset: GuardarPresetProyecto | None,
+        cargar_preset: CargarPresetProyecto | None,
+        guardar_credencial: GuardarCredencial | None,
+        catalogo_blueprints: list[tuple[str, str, str]] | None,
+    ) -> bool:
+        return (
+            generar_proyecto is None
+            or guardar_preset is None
+            or cargar_preset is None
+            or guardar_credencial is None
+            or catalogo_blueprints is None
+        )
+
+    def _crear_widgets(self) -> None:
         self.pagina_datos = PaginaDatosProyecto()
         self.pagina_clases = PaginaClases()
         self.pagina_persistencia = PaginaPersistencia()
         self.pagina_resumen = PaginaResumen()
+        self._etiqueta_estado = QLabel("")
+        self._barra_progreso = QProgressBar()
+        self._barra_progreso.setRange(0, 0)
 
+    def _configurar_paginas(self) -> None:
         self.addPage(self.pagina_datos)
         self.addPage(self.pagina_clases)
         self.addPage(self.pagina_persistencia)
         self.addPage(self.pagina_resumen)
 
-        self._etiqueta_estado = QLabel("")
-        self._barra_progreso = QProgressBar()
-        self._barra_progreso.setRange(0, 0)
-        self._barra_progreso.hide()
-
+    def _configurar_layout(self) -> None:
         layout = self.layout()
         if isinstance(layout, QVBoxLayout):
             layout.addWidget(self._etiqueta_estado)
             layout.addWidget(self._barra_progreso)
 
+    def _configurar_botones(self) -> None:
+        self._barra_progreso.hide()
+
+    def _conectar_senales(self) -> None:
         self.pagina_datos.boton_guardar_preset.clicked.connect(self._guardar_preset_desde_ui)
         self.pagina_datos.boton_cargar_preset.clicked.connect(self._cargar_preset_desde_ui)
         self.button(QWizard.FinishButton).clicked.connect(self._al_finalizar)
 
+    def _inicializar_estado(self) -> None:
         self.pagina_persistencia.establecer_blueprints_disponibles(
             self._catalogo_blueprints,
             BLUEPRINTS_MVP,
