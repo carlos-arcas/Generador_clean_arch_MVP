@@ -2,14 +2,14 @@
 
 ## 1) Resumen ejecutivo
 - Estado general: **CON FALLOS CRÍTICOS**.
-- Puntaje total: **41.70/60.00 (69.5%)**.
+- Puntaje total: **44.30/60.00 (73.8%)**.
 - Fallos críticos: **Sí**.
 
 ## 2) Tabla de puntuación por sección
 | Sección | Puntaje | Estado |
 |---|---:|---|
-| A - Estructura y Clean Architecture | 7.20/10 | FAIL |
-| B - Testing y Cobertura | 2.80/10 | PASS |
+| A - Estructura y Clean Architecture | 9.20/10 | FAIL |
+| B - Testing y Cobertura | 3.40/10 | PASS |
 | C - Scripts reproducibles Windows | 10.00/10 | PASS |
 | D - Observabilidad / Logging | 9.70/10 | PASS |
 | E - Documentación | 9.00/10 | PASS |
@@ -17,11 +17,6 @@
 
 ## 3) Lista priorizada de faltantes (P0/P1/P2)
 ### P0
-- [A] Aplicación depende de infraestructura/presentación | Acción: Usar puertos e inversión de dependencias | Ruta: `aplicacion/mapeadores/__init__.py:3`
-- [A] Aplicación depende de infraestructura/presentación | Acción: Usar puertos e inversión de dependencias | Ruta: `aplicacion/mapeadores/mapeador_dominio_a_presentacion.py:5`
-- [A] Aplicación depende de infraestructura/presentación | Acción: Usar puertos e inversión de dependencias | Ruta: `aplicacion/dtos_presentacion/__init__.py:3`
-- [A] Aplicación depende de infraestructura/presentación | Acción: Usar puertos e inversión de dependencias | Ruta: `aplicacion/dtos_presentacion/__init__.py:4`
-- [A] Aplicación depende de infraestructura/presentación | Acción: Usar puertos e inversión de dependencias | Ruta: `aplicacion/dtos_presentacion/dto_clase_presentacion.py:7`
 - [A] Aplicación depende de infraestructura/presentación | Acción: Usar puertos e inversión de dependencias | Ruta: `aplicacion/casos_uso/auditoria/reglas_dependencias/__init__.py:3`
 - [A] Aplicación depende de infraestructura/presentación | Acción: Usar puertos e inversión de dependencias | Ruta: `aplicacion/casos_uso/auditoria/reglas_dependencias/__init__.py:13`
 ### P1
@@ -31,29 +26,27 @@
 - [F] Mensajes de error genéricos detectados | Acción: Agregar códigos y causa accionable para usuario | Ruta: `herramientas/auditar_completitud_producto.py contiene 'falló mvp'`
 ### P2
 - [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `dominio.plan_generacion`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.validacion.motor_validacion`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.validacion.regla_validacion`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.validacion.resultado_validacion`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.dtos_presentacion.dto_clase_presentacion`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.dtos_presentacion.dto_atributo_presentacion`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.puertos.generador_manifest_puerto`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.puertos.descubridor_plugins_puerto`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.puertos.calculadora_hash_puerto`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.errores.errores_pipeline`
 - [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.errores.errores_generacion`
 - [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.errores.errores_validacion`
 - [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.errores.errores_auditoria`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.errores.errores_pipeline`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.puertos.descubridor_plugins_puerto`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.puertos.generador_manifest_puerto`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.puertos.calculadora_hash_puerto`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.validacion.resultado_validacion`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.validacion.motor_validacion`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.validacion.regla_validacion`
 - [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.dtos.proyecto.dto_atributo`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.seguridad.obtener_credencial`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.seguridad.eliminar_credencial`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.gestion_clases.modificar_clase`
 - [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.gestion_clases.validaciones_clase`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.generacion.pasos.ejecutar_auditoria`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.generacion.pasos.rollback_generacion`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.generacion.pasos.normalizar_entrada`
-- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.generacion.pasos.validar_entrada`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.gestion_clases.modificar_clase`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.seguridad.eliminar_credencial`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.seguridad.obtener_credencial`
 - [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.auditoria.reglas_dependencias.regla_no_imports_circulares`
 - [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.auditoria.reglas_dependencias.regla_base`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.generacion.pasos.rollback_generacion`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.generacion.pasos.validar_entrada`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.generacion.pasos.normalizar_entrada`
+- [B] Módulo público sin referencia en tests | Acción: Agregar test que importe o mencione el módulo | Ruta: `aplicacion.casos_uso.generacion.pasos.ejecutar_auditoria`
 - [F] Recomendación UX: ID de incidente por operación | Acción: Agregar correlación de incidente en pantalla | Ruta: `presentacion/`
 - [F] Recomendación UX: botón copiar detalles/abrir logs | Acción: Agregar acciones de soporte en UI | Ruta: `presentacion/`
 - [F] Recomendación UX: estado cargando y re-habilitar botones | Acción: Controlar estado durante operaciones | Ruta: `presentacion/`
