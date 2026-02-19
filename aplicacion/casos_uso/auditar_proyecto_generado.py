@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 import re
 
+from aplicacion.casos_uso.auditoria.validadores import ContextoAuditoria, ValidadorAuditoria, ValidadorImports
 from aplicacion.errores import ErrorAuditoria, ErrorInfraestructura
 from aplicacion.puertos.calculadora_hash_puerto import CalculadoraHashPuerto
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos
@@ -69,6 +70,19 @@ class AuditarProyectoGenerado:
     ) -> None:
         self._ejecutor_procesos = ejecutor_procesos
         self._calculadora_hash = calculadora_hash or _CalculadoraHashLocal()
+        self._validadores_auditoria = self._crear_validadores_auditoria()
+
+    def _crear_validadores_auditoria(self) -> list[ValidadorAuditoria]:
+        return [ValidadorImports()]
+
+    def _ejecutar_validadores(self, base: Path) -> list[str]:
+        LOGGER.info("Evaluando validadores modulares de auditoría")
+        contexto = ContextoAuditoria(base=base)
+        errores: list[str] = []
+        for validador in self._validadores_auditoria:
+            resultado = validador.validar(contexto)
+            errores.extend(resultado.errores)
+        return errores
 
     def ejecutar(self, ruta_proyecto: str, blueprints_usados: list[str] | None = None) -> ResultadoAuditoria:
         """Ejecuta las validaciones obligatorias sobre un proyecto ya generado."""
@@ -82,7 +96,7 @@ class AuditarProyectoGenerado:
 
         try:
             errores.extend(self._validar_estructura(base))
-            errores.extend(self._validar_imports(base))
+            errores.extend(self._ejecutar_validadores(base))
             errores.extend(self._validar_logging(base))
             errores.extend(self._validar_dependencias_informes(base, blueprints))
             errores.extend(self._validar_consistencia_manifest(base))
@@ -140,57 +154,6 @@ class AuditarProyectoGenerado:
                 errores.append(f"No existe el recurso obligatorio: {relativo}")
         return errores
 
-    def _validar_imports(self, base: Path) -> list[str]:
-        LOGGER.info("Evaluando reglas de arquitectura por imports")
-        errores: list[str] = []
-        modulos_estandar_restringidos = {"json", "sqlite3"}
-        modulos_exportacion = {"openpyxl", "reportlab"}
-        prefijos_externos = {"pydantic", "requests", "sqlalchemy", "fastapi", "pyside6"}
-        patron_import = re.compile(r"^\s*import\s+([a-zA-Z0-9_\.]+)", re.MULTILINE)
-        patron_from = re.compile(r"^\s*from\s+([a-zA-Z0-9_\.]+)\s+import\s+", re.MULTILINE)
-        grafo_imports: dict[str, set[str]] = {}
-
-        for ruta_archivo in base.rglob("*.py"):
-            relativo = ruta_archivo.relative_to(base)
-            modulo_actual = self._ruta_a_modulo(relativo)
-            contenido = ruta_archivo.read_text(encoding="utf-8")
-            imports = set(patron_import.findall(contenido)) | set(patron_from.findall(contenido))
-            grafo_imports[modulo_actual] = imports
-            if not relativo.parts:
-                continue
-
-            for modulo in imports:
-                modulo_raiz = modulo.lower().split(".")[0]
-                if modulo_raiz == "sqlite3" and relativo.parts[0] != "infraestructura":
-                    errores.append(f"Import sqlite3 fuera de infraestructura ({relativo}): {modulo}")
-                if modulo_raiz in modulos_exportacion and relativo.parts[0] != "infraestructura":
-                    errores.append(f"Import {modulo_raiz} fuera de infraestructura ({relativo}): {modulo}")
-
-            if relativo.parts[0] == "dominio":
-                for modulo in imports:
-                    modulo_bajo = modulo.lower()
-                    if modulo_bajo.startswith("infraestructura"):
-                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.startswith("presentacion"):
-                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.startswith("pyside6"):
-                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.split(".")[0] in modulos_estandar_restringidos:
-                        errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-                    if modulo_bajo.split(".")[0] in prefijos_externos:
-                        errores.append(f"Import externo no permitido en dominio ({relativo}): {modulo}")
-            elif relativo.parts[0] == "aplicacion":
-                for modulo in imports:
-                    if modulo.lower().startswith("presentacion"):
-                        errores.append(f"Import prohibido en aplicación ({relativo}): {modulo}")
-            elif relativo.parts[0] == "presentacion":
-                for modulo in imports:
-                    if modulo.lower().startswith("infraestructura"):
-                        errores.append(f"Import prohibido en presentación ({relativo}): {modulo}")
-
-        errores.extend(self._detectar_ciclos_basicos(grafo_imports))
-        return errores
-
     def _validar_dependencias_informes(self, base: Path, blueprints: list[str]) -> list[str]:
         blueprints_informes = {"export_excel", "export_pdf"}
         if not any(nombre in blueprints_informes for nombre in blueprints):
@@ -228,14 +191,6 @@ class AuditarProyectoGenerado:
             if hash_actual != hash_esperado:
                 errores.append(f"Hash inconsistente para {ruta_relativa} en manifest.json")
         return errores
-
-    def _detectar_ciclos_basicos(self, grafo_imports: dict[str, set[str]]) -> list[str]:
-        errores: list[str] = []
-        for modulo, dependencias in grafo_imports.items():
-            for dependencia in dependencias:
-                if dependencia in grafo_imports and modulo in grafo_imports.get(dependencia, set()):
-                    errores.append(f"Import circular detectado entre {modulo} y {dependencia}")
-        return sorted(set(errores))
 
     def _validar_logging(self, base: Path) -> list[str]:
         LOGGER.info("Evaluando reglas de logging")
@@ -304,6 +259,3 @@ class AuditarProyectoGenerado:
 
         ruta_informe.write_text(contenido, encoding="utf-8")
 
-    def _ruta_a_modulo(self, relativa: Path) -> str:
-        sin_sufijo = relativa.with_suffix("")
-        return ".".join(sin_sufijo.parts)
