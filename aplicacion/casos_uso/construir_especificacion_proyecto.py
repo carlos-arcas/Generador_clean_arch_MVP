@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from aplicacion.dtos.proyecto import DtoProyectoEntrada
+from aplicacion.dtos.proyecto import DtoAtributo, DtoProyectoEntrada
 from aplicacion.errores import ErrorValidacion
 from dominio.especificacion import (
     ErrorValidacionDominio,
@@ -46,16 +46,46 @@ class ConstruirEspecificacionProyecto:
         return especificacion
 
     def _validar_dto(self, dto: DtoProyectoEntrada) -> None:
+        self._validar_nombre(dto)
+        self._validar_ruta(dto)
+        self._validar_clases(dto)
+        self._validar_atributos(dto)
+        self._validar_tipos(dto)
+
+    def _validar_nombre(self, dto: DtoProyectoEntrada) -> None:
         if not dto.nombre_proyecto.strip():
             raise ErrorValidacion("El nombre del proyecto no puede estar vacío.")
+
+    def _validar_ruta(self, dto: DtoProyectoEntrada) -> None:
         if not dto.ruta_destino.strip():
             raise ErrorValidacion("La ruta de destino no puede estar vacía.")
 
+    def _validar_clases(self, dto: DtoProyectoEntrada) -> None:
+        nombres = [clase.nombre.strip() for clase in dto.clases]
+        duplicadas = {nombre for nombre in nombres if nombre and nombres.count(nombre) > 1}
+        if duplicadas:
+            raise ErrorValidacion(f"La especificación contiene clases duplicadas: {sorted(duplicadas)}")
+
+    def _validar_atributos(self, dto: DtoProyectoEntrada) -> None:
         for clase in dto.clases:
-            if not clase.atributos:
-                raise ErrorValidacion(
-                    f"La clase '{clase.nombre.strip() or '(sin nombre)'}' debe tener al menos un atributo."
-                )
+            self._validar_atributos_por_clase(clase.nombre, clase.atributos)
+
+    def _validar_atributos_por_clase(
+        self,
+        nombre_clase: str,
+        atributos: list[DtoAtributo],
+    ) -> None:
+        if not atributos:
+            nombre_clase_limpio = nombre_clase.strip() or "(sin nombre)"
+            raise ErrorValidacion(
+                f"La clase '{nombre_clase_limpio}' debe tener al menos un atributo."
+            )
+        for atributo in atributos:
+            if not atributo.nombre.strip():
+                raise ErrorValidacion("El nombre del atributo no puede estar vacío.")
+
+    def _validar_tipos(self, dto: DtoProyectoEntrada) -> None:
+        for clase in dto.clases:
             for atributo in clase.atributos:
                 if atributo.tipo.strip() not in self.TIPOS_ATRIBUTO_VALIDOS:
                     raise ErrorValidacion(
