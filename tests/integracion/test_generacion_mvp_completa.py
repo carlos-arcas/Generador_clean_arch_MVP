@@ -14,6 +14,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
     GenerarProyectoMvp,
     GenerarProyectoMvpEntrada,
 )
+from aplicacion.casos_uso.generacion.pasos.errores_pipeline import ErrorEjecucionPlanGeneracion
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
 from dominio.excepciones.proyecto_ya_existe_error import ProyectoYaExisteError
 from dominio.modelos import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
@@ -112,17 +113,16 @@ def test_generacion_mvp_hace_rollback_si_falla_plan(tmp_path: Path) -> None:
     ruta_proyecto = tmp_path / nombre_proyecto
     especificacion = _crear_especificacion(tmp_path, nombre_proyecto)
 
-    salida = caso_uso.ejecutar(
-        GenerarProyectoMvpEntrada(
-            especificacion_proyecto=especificacion,
-            ruta_destino=str(tmp_path),
-            nombre_proyecto=nombre_proyecto,
-            blueprints=["base_clean_arch_v1", "blueprint_inexistente_v1"],
+    with pytest.raises(ErrorEjecucionPlanGeneracion):
+        caso_uso.ejecutar(
+            GenerarProyectoMvpEntrada(
+                especificacion_proyecto=especificacion,
+                ruta_destino=str(tmp_path),
+                nombre_proyecto=nombre_proyecto,
+                blueprints=["base_clean_arch_v1", "blueprint_inexistente_v1"],
+            )
         )
-    )
 
-    assert salida.valido is False
-    assert salida.errores
     assert not ruta_proyecto.exists()
 
 
