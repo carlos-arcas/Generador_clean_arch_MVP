@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 import re
 
@@ -12,12 +13,33 @@ from aplicacion.casos_uso.auditoria.validadores.validador_base import (
 )
 
 
+@dataclass(frozen=True)
+class ReglaImportDominio:
+    """Regla declarativa para validar imports en dominio."""
+
+    tipo: str
+    valor: str
+    mensaje_error: str
+
+
+REGLAS_IMPORTS_DOMINIO = [
+    ReglaImportDominio(tipo="prefijo", valor="infraestructura", mensaje_error="Import prohibido en dominio"),
+    ReglaImportDominio(tipo="prefijo", valor="presentacion", mensaje_error="Import prohibido en dominio"),
+    ReglaImportDominio(tipo="prefijo", valor="pyside6", mensaje_error="Import prohibido en dominio"),
+    ReglaImportDominio(tipo="raiz", valor="json", mensaje_error="Import prohibido en dominio"),
+    ReglaImportDominio(tipo="raiz", valor="sqlite3", mensaje_error="Import prohibido en dominio"),
+    ReglaImportDominio(tipo="raiz", valor="pydantic", mensaje_error="Import externo no permitido en dominio"),
+    ReglaImportDominio(tipo="raiz", valor="requests", mensaje_error="Import externo no permitido en dominio"),
+    ReglaImportDominio(tipo="raiz", valor="sqlalchemy", mensaje_error="Import externo no permitido en dominio"),
+    ReglaImportDominio(tipo="raiz", valor="fastapi", mensaje_error="Import externo no permitido en dominio"),
+    ReglaImportDominio(tipo="raiz", valor="pyside6", mensaje_error="Import externo no permitido en dominio"),
+]
+
+
 class ValidadorImports(ValidadorAuditoria):
     """Valida dependencias permitidas por capa usando imports Python."""
 
-    _MODULOS_ESTANDAR_RESTRINGIDOS = {"json", "sqlite3"}
     _MODULOS_EXPORTACION = {"openpyxl", "reportlab"}
-    _PREFIJOS_EXTERNOS = {"pydantic", "requests", "sqlalchemy", "fastapi", "pyside6"}
 
     def __init__(self) -> None:
         self._patron_import = re.compile(r"^\s*import\s+([a-zA-Z0-9_\.]+)", re.MULTILINE)
@@ -69,26 +91,30 @@ class ValidadorImports(ValidadorAuditoria):
 
     def _regla_imports_dominio(self, relativo: Path, imports: set[str], errores: list[str]) -> None:
         for modulo in imports:
-            modulo_bajo = modulo.lower()
-            if modulo_bajo.startswith("infraestructura"):
-                errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-            if modulo_bajo.startswith("presentacion"):
-                errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-            if modulo_bajo.startswith("pyside6"):
-                errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-            if modulo_bajo.split(".")[0] in self._MODULOS_ESTANDAR_RESTRINGIDOS:
-                errores.append(f"Import prohibido en dominio ({relativo}): {modulo}")
-            if modulo_bajo.split(".")[0] in self._PREFIJOS_EXTERNOS:
-                errores.append(f"Import externo no permitido en dominio ({relativo}): {modulo}")
+            for regla in REGLAS_IMPORTS_DOMINIO:
+                error = self._evaluar_regla(regla, relativo, modulo)
+                if error:
+                    errores.append(error)
+
+    def _evaluar_regla(self, regla: ReglaImportDominio, relativo: Path, modulo: str) -> str | None:
+        modulo_bajo = modulo.lower()
+        if regla.tipo == "prefijo":
+            coincide = modulo_bajo.startswith(regla.valor)
+        else:
+            coincide = modulo_bajo.split(".")[0] == regla.valor
+
+        if coincide:
+            return f"{regla.mensaje_error} ({relativo}): {modulo}"
+        return None
 
     def _regla_imports_aplicacion(self, relativo: Path, imports: set[str], errores: list[str]) -> None:
         for modulo in imports:
-            if modulo.lower().startswith("presentacion"):
+            if modulo.lower().startswith("presentacion") or modulo.lower().startswith("infraestructura"):
                 errores.append(f"Import prohibido en aplicación ({relativo}): {modulo}")
 
     def _regla_imports_presentacion(self, relativo: Path, imports: set[str], errores: list[str]) -> None:
         for modulo in imports:
-            if modulo.lower().startswith("infraestructura"):
+            if modulo.lower().startswith("infraestructura") or modulo.lower().startswith("dominio"):
                 errores.append(f"Import prohibido en presentación ({relativo}): {modulo}")
 
     def _detectar_ciclos_basicos(self, grafo_imports: dict[str, set[str]]) -> list[str]:
