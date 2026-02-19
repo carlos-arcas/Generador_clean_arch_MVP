@@ -16,7 +16,7 @@
 ## Nuevos hallazgos
 
 - No se detectan nuevos hallazgos ALTO.
-- Se mantiene un ALTO histórico **justificado** en mapper de anti-corrupción (`presentacion/mappers/mapper_dominio_a_presentacion.py:5`).
+- Se eliminó el ALTO histórico de mapper anti-corrupción al moverlo a aplicación (`aplicacion/mapeadores/mapeador_dominio_a_presentacion.py`).
 
 ## Tendencia estructural
 

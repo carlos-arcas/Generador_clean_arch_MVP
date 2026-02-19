@@ -15,7 +15,6 @@ MAX_ARCHIVOS_PRESENTACION_LOC_450 = 1
 LISTA_BLANCA_IMPORTS_PROHIBIDOS = {
     ("presentacion/modelos_qt/modelo_atributos.py", 7),
     ("presentacion/modelos_qt/modelo_clases.py", 7),
-    ("presentacion/mappers/mapper_dominio_a_presentacion.py", 5),
 }
 
 

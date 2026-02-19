@@ -1,4 +1,4 @@
-"""DTO de presentación para atributos sin dependencias de dominio."""
+"""DTO de presentación para atributos sin dependencias de dominio ni framework UI."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class DtoAtributoPresentacion:
-    """Representa un atributo para consumo de la capa de presentación."""
+    """Representa un atributo plano para la capa de presentación."""
 
     nombre: str
     tipo: str

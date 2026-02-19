@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 QtCore = pytest.importorskip("PySide6.QtCore", exc_type=ImportError)
 Qt = QtCore.Qt
 
-from presentacion.dtos import DtoAtributoPresentacion, DtoClasePresentacion
+from aplicacion.dtos_presentacion import DtoAtributoPresentacion, DtoClasePresentacion
 from presentacion.modelos_qt.modelo_atributos import ModeloAtributos
 from presentacion.modelos_qt.modelo_clases import ModeloClases
 

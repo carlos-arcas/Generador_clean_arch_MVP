@@ -21,7 +21,7 @@ Lectura de tendencia:
 No hay hallazgos ALTO no justificados.
 
 Hallazgo ALTO justificado:
-- `presentacion/mappers/mapper_dominio_a_presentacion.py:5` — import `presentacion -> dominio`, deuda técnica transitoria aceptada por rol de mapper anti-corrupción en migración a DTOs.
+- ✅ Eliminado el ALTO histórico de `presentacion -> dominio`: el mapper anti-corrupción fue movido a `aplicacion/mapeadores/mapeador_dominio_a_presentacion.py` y presentación quedó aislada de dominio.
 
 ## 4) Lista de hallazgos MEDIO
 
