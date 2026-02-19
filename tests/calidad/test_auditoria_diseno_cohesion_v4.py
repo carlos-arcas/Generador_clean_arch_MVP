@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+from pathlib import Path
+import warnings
+
+from herramientas.auditar_diseno_cohesion_v4 import auditar_diseno_cohesion_v4
+
+IMPORTS_PROHIBIDOS = {
+    "Import prohibido presentacion->dominio",
+    "Import prohibido aplicacion->infraestructura",
+    "Import prohibido dominio->otras_capas",
+}
+
+
+def test_auditoria_diseno_cohesion_v4_bloquea_regresiones_criticas() -> None:
+    raiz = Path(__file__).resolve().parents[2]
+    resultado = auditar_diseno_cohesion_v4(raiz)
+    hallazgos = resultado["hallazgos"]
+
+    hallazgos_alto = [h for h in hallazgos if h["severidad"] == "ALTO"]
+    if hallazgos_alto:
+        detalle = "\n".join(
+            f"- {h['archivo']}:{h['linea']} | {h['regla']} | {h['detalle']}" for h in hallazgos_alto
+        )
+        raise AssertionError(f"Se detectaron hallazgos ALTO en auditoría v4:\n{detalle}")
+
+    imports_prohibidos = [h for h in hallazgos if h["regla"] in IMPORTS_PROHIBIDOS]
+    if imports_prohibidos:
+        detalle = "\n".join(
+            f"- {h['archivo']}:{h['linea']} | {h['regla']} | {h['detalle']}" for h in imports_prohibidos
+        )
+        raise AssertionError(f"Regresión: se detectaron imports prohibidos por capa:\n{detalle}")
+
+    except_exception = [h for h in hallazgos if h["regla"] == "except Exception fuera de entrypoint"]
+    if except_exception:
+        detalle = "\n".join(f"- {h['archivo']}:{h['linea']} | {h['detalle']}" for h in except_exception)
+        raise AssertionError(f"Regresión: apareció 'except Exception' fuera de entrypoints:\n{detalle}")
+
+    accesos_privados = [h for h in hallazgos if h["regla"] == "Acceso encadenado a privados"]
+    if accesos_privados:
+        detalle = "\n".join(f"- {h['archivo']}:{h['linea']} | {h['detalle']}" for h in accesos_privados)
+        raise AssertionError(f"Regresión: reapareció acceso encadenado a privados:\n{detalle}")
+
+    hallazgos_medio = [h for h in hallazgos if h["severidad"] == "MEDIO"]
+    if hallazgos_medio:
+        warnings.warn(
+            f"Auditoría v4 reporta {len(hallazgos_medio)} hallazgos MEDIO (no bloqueante).",
+            stacklevel=2,
+        )
+
+    assert resultado["resumen"]["nota_final"] >= 9.5
