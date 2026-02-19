@@ -10,7 +10,7 @@ def test_finalizacion_informe_contiene_evidencias() -> None:
         ruta_sandbox="/tmp/sandbox",
         etapas=[
             ResultadoEtapa("Preparación", "PASS", 10, "OK"),
-            ResultadoEtapa("Preflight conflictos", "FAIL", 5, "Duplicadas"),
+            ResultadoEtapa("Preflight conflictos de rutas", "FAIL", 5, "Duplicadas", tipo_fallo="CONFLICTO", codigo="CON-001", mensaje_usuario="duplicadas"),
         ],
         conflictos=ConflictosFinalizacion(
             total_rutas_duplicadas=1,
@@ -24,7 +24,8 @@ def test_finalizacion_informe_contiene_evidencias() -> None:
             "meta_comando": "python -m presentacion.cli auditar-finalizacion --preset preset.json --sandbox /tmp/sandbox",
             "preparacion": "ok",
             "carga_preset": "ok",
-            "preflight_conflictos": "duplicadas",
+            "preflight_validacion_entrada": "ok",
+            "preflight_conflictos_rutas": "duplicadas",
             "generacion_sandbox": "skip",
             "auditoria_arquitectura": "skip",
             "smoke_test": "skip",
@@ -34,6 +35,6 @@ def test_finalizacion_informe_contiene_evidencias() -> None:
     markdown = generar_markdown(salida)
 
     assert "ID ejecución" in markdown
-    assert "| Preflight conflictos | FAIL |" in markdown
-    assert "Preflight Conflictos" in markdown
+    assert "| Preflight conflictos de rutas | FAIL |" in markdown
+    assert "Preflight Conflictos Rutas" in markdown
     assert "app/persona.py -> [crud_a, crud_b]" in markdown

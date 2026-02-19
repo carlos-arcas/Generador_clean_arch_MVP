@@ -13,6 +13,10 @@ class ResultadoEtapa:
     estado: str
     duracion_ms: int
     resumen: str
+    tipo_fallo: str | None = None
+    codigo: str | None = None
+    mensaje_usuario: str | None = None
+    detalle_tecnico: str | None = None
 
 
 @dataclass(frozen=True)

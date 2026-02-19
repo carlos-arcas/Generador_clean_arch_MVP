@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from aplicacion.dtos.auditoria import DtoAuditoriaFinalizacionSalida
+from aplicacion.dtos.auditoria import CONFLICTO, INESPERADO, IO, VALIDACION, DtoAuditoriaFinalizacionSalida
 
 
 def generar_markdown(salida: DtoAuditoriaFinalizacionSalida) -> str:
@@ -20,7 +20,8 @@ def generar_markdown(salida: DtoAuditoriaFinalizacionSalida) -> str:
     for clave in (
         "preparacion",
         "carga_preset",
-        "preflight_conflictos",
+        "preflight_validacion_entrada",
+        "preflight_conflictos_rutas",
         "generacion_sandbox",
         "auditoria_arquitectura",
         "smoke_test",
@@ -29,22 +30,7 @@ def generar_markdown(salida: DtoAuditoriaFinalizacionSalida) -> str:
         titulo = clave.replace("_", " ").title()
         evidencias.append(f"### {titulo}\n```text\n{texto}\n```")
 
-    diagnostico = "Sin incidencias críticas."
-    if salida.conflictos is not None:
-        rutas = salida.conflictos.rutas_por_blueprint.items()
-        top = "\n".join(f"- {ruta} -> [{', '.join(blueprints)}]" for ruta, blueprints in list(rutas)[:5])
-        diagnostico = (
-            "Causa: solapamiento de blueprints.\n"
-            "Acción: desactivar blueprint X o Y según la ruta duplicada reportada.\n"
-            "Regla: 1 entidad = 1 blueprint CRUD.\n"
-            f"Rutas representativas:\n{top}"
-        )
-    elif salida.evidencias.get("incidente_id"):
-        diagnostico = (
-            f"Fallo inesperado detectado.\n"
-            f"ID incidente: {salida.evidencias.get('incidente_id')}\n"
-            f"Ruta logs: {salida.evidencias.get('ruta_evidencias', '')}"
-        )
+    diagnostico = _diagnostico(salida)
 
     return (
         "# Auditoría de finalización E2E (informe real)\n\n"
@@ -63,3 +49,37 @@ def generar_markdown(salida: DtoAuditoriaFinalizacionSalida) -> str:
         "## Comandos de reproducción\n\n"
         f"`{cmd}`\n"
     )
+
+
+def _diagnostico(salida: DtoAuditoriaFinalizacionSalida) -> str:
+    etapa_fail = next((etapa for etapa in salida.etapas if etapa.estado == "FAIL"), None)
+    if etapa_fail is None:
+        return "Sin incidencias críticas."
+
+    prefijo = {
+        VALIDACION: "Fallo de validación",
+        CONFLICTO: "Conflicto de generación",
+        IO: "Fallo de E/S",
+        INESPERADO: "Fallo inesperado",
+    }.get(etapa_fail.tipo_fallo or INESPERADO, "Fallo inesperado")
+
+    partes = [
+        f"{prefijo}.",
+        f"Etapa: {etapa_fail.nombre}",
+        f"Código: {etapa_fail.codigo or 'N/D'}",
+        f"Tipo: {etapa_fail.tipo_fallo or INESPERADO}",
+        f"Mensaje: {etapa_fail.mensaje_usuario or etapa_fail.resumen}",
+    ]
+
+    if salida.conflictos is not None:
+        rutas = salida.conflictos.rutas_por_blueprint.items()
+        top = "\n".join(f"- {ruta} -> [{', '.join(blueprints)}]" for ruta, blueprints in list(rutas)[:5])
+        partes.append(f"Mapa ruta -> [blueprints]:\n{top}")
+
+    if etapa_fail.detalle_tecnico:
+        partes.append(f"Detalle técnico:\n{etapa_fail.detalle_tecnico}")
+
+    if (etapa_fail.tipo_fallo or INESPERADO) == INESPERADO and salida.evidencias.get("incidente_id"):
+        partes.append(f"ID incidente: {salida.evidencias.get('incidente_id')}")
+
+    return "\n".join(partes)
