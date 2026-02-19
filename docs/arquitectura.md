@@ -73,3 +73,9 @@ Si se detecta una importación prohibida, la prueba falla indicando de forma exp
 - línea detectada
 
 De esta forma, la arquitectura se valida de manera ejecutable en cada ejecución de tests.
+
+## DTOs y mapeadores de vista
+Los artefactos de UI se ubican en `presentacion/dtos/` y `presentacion/mapeadores/`.
+`DtoVistaClase` y `DtoVistaAtributo` modelan datos listos para widget/CLI sin arrastrar detalles de casos de uso.
+El mapeador `mapeador_dominio_a_vista.py` adapta entidades de dominio a DTOs de vista y viceversa para edición en UI.
+Con esto, `aplicacion/` queda libre de módulos `*_presentacion*` y se respeta la dirección de dependencias por capa.

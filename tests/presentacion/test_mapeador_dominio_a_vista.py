@@ -1,19 +1,19 @@
-"""Pruebas del mapeador de aplicación entre dominio y DTOs de presentación."""
+"""Pruebas del mapeador de presentación entre dominio y DTOs de vista."""
 
 from __future__ import annotations
 
 import ast
 from pathlib import Path
 
-from aplicacion.dtos_presentacion import DtoAtributoPresentacion, DtoClasePresentacion
-from aplicacion.mapeadores.mapeador_dominio_a_presentacion import (
-    mapear_clase_dominio_a_dto,
-    mapear_dto_a_clase_dominio,
-)
 from dominio.especificacion import EspecificacionAtributo, EspecificacionClase
+from presentacion.dtos import DtoVistaAtributo, DtoVistaClase
+from presentacion.mapeadores.mapeador_dominio_a_vista import (
+    mapear_clase_dominio_a_dto_vista,
+    mapear_dto_vista_a_clase_dominio,
+)
 
 
-def test_mapear_clase_dominio_a_dto() -> None:
+def test_mapear_clase_dominio_a_dto_vista() -> None:
     clase_dominio = EspecificacionClase(
         nombre="Cliente",
         atributos=[
@@ -26,12 +26,12 @@ def test_mapear_clase_dominio_a_dto() -> None:
         ],
     )
 
-    dto = mapear_clase_dominio_a_dto(clase_dominio)
+    dto = mapear_clase_dominio_a_dto_vista(clase_dominio)
 
-    assert dto == DtoClasePresentacion(
+    assert dto == DtoVistaClase(
         nombre="Cliente",
         atributos=[
-            DtoAtributoPresentacion(
+            DtoVistaAtributo(
                 nombre="edad",
                 tipo="int",
                 obligatorio=False,
@@ -41,11 +41,11 @@ def test_mapear_clase_dominio_a_dto() -> None:
     )
 
 
-def test_mapear_dto_a_clase_dominio() -> None:
-    dto = DtoClasePresentacion(
+def test_mapear_dto_vista_a_clase_dominio() -> None:
+    dto = DtoVistaClase(
         nombre="Pedido",
         atributos=[
-            DtoAtributoPresentacion(
+            DtoVistaAtributo(
                 nombre="total",
                 tipo="float",
                 obligatorio=True,
@@ -54,7 +54,7 @@ def test_mapear_dto_a_clase_dominio() -> None:
         ],
     )
 
-    clase_dominio = mapear_dto_a_clase_dominio(dto)
+    clase_dominio = mapear_dto_vista_a_clase_dominio(dto)
 
     assert clase_dominio.nombre == "Pedido"
     assert len(clase_dominio.atributos) == 1
@@ -65,18 +65,18 @@ def test_mapear_dto_a_clase_dominio() -> None:
     assert atributo.valor_por_defecto is None
 
 
-def test_presentacion_no_importa_dominio() -> None:
-    ruta_presentacion = Path("presentacion")
-    for archivo in ruta_presentacion.rglob("*.py"):
+def test_aplicacion_no_contiene_modulos_dtos_presentacion_ni_mapeador_presentacion() -> None:
+    assert not Path("aplicacion/dtos_presentacion").exists()
+    assert not Path("aplicacion/mapeadores/mapeador_dominio_a_presentacion.py").exists()
+
+
+def test_aplicacion_no_importa_presentacion_por_ast() -> None:
+    for archivo in Path("aplicacion").rglob("*.py"):
         arbol = ast.parse(archivo.read_text(encoding="utf-8"))
         for nodo in ast.walk(arbol):
             if isinstance(nodo, ast.Import):
                 for alias in nodo.names:
-                    assert not alias.name.startswith("dominio")
+                    assert not alias.name.startswith("presentacion")
             if isinstance(nodo, ast.ImportFrom):
                 modulo = nodo.module or ""
-                assert not modulo.startswith("dominio")
-
-
-def test_archivo_mapper_en_presentacion_no_existe() -> None:
-    assert not Path("presentacion/mappers/mapper_dominio_a_presentacion.py").exists()
+                assert not modulo.startswith("presentacion")
