@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import argparse
 import json
 import logging
 import re
@@ -251,8 +252,36 @@ def auditar_diseno_cohesion_v3(raiz: Path) -> dict[str, Any]:
     }
 
 
+def _parsear_argumentos() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Audita diseño/cohesión v3 del repositorio")
+    parser.add_argument(
+        "--raiz",
+        type=Path,
+        default=Path(__file__).resolve().parents[1],
+        help="Ruta raíz del repositorio a auditar",
+    )
+    parser.add_argument("--salida", type=Path, required=True, help="Ruta de salida JSON")
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Activa logging DEBUG para mayor detalle",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = _parsear_argumentos()
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.INFO,
+        format="%(levelname)s:%(name)s:%(message)s",
+    )
+    resultado = auditar_diseno_cohesion_v3(args.raiz.resolve())
+    args.salida.parent.mkdir(parents=True, exist_ok=True)
+    args.salida.write_text(json.dumps(resultado, ensure_ascii=False, indent=2), encoding="utf-8")
+    LOGGER.info("Auditoría v3 escrita en %s", args.salida)
+    LOGGER.debug("Resumen v3: %s", resultado.get("resumen", {}))
+    return 0
+
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
-    raiz_repo = Path(__file__).resolve().parents[1]
-    resultado = auditar_diseno_cohesion_v3(raiz_repo)
-    print(json.dumps(resultado, ensure_ascii=False, indent=2))
+    raise SystemExit(main())

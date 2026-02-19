@@ -455,6 +455,8 @@ def _evaluar_logging(ruta_repo: Path) -> tuple[ResultadoSeccion, list[str]]:
     prints_detectados: list[str] = []
     for archivo in _iterar_archivos_python(ruta_repo):
         relativa = archivo.relative_to(ruta_repo).as_posix()
+        if Path(relativa).parts and Path(relativa).parts[0] == "tests":
+            continue
         texto = _leer_texto_seguro(archivo)
         lineas = texto.splitlines()
         try:
@@ -468,10 +470,19 @@ def _evaluar_logging(ruta_repo: Path) -> tuple[ResultadoSeccion, list[str]]:
                 numero = int(getattr(nodo, "lineno", 1))
                 contenido = lineas[numero - 1].strip() if numero - 1 < len(lineas) else "print(...)"
                 prints_detectados.append(f"{relativa}:{numero}: {contenido}")
-    evidencias.append(f"print( detectados: {len(prints_detectados)}")
+    evidencias.append(f"print( detectados fuera de tests/: {len(prints_detectados)}")
     if prints_detectados:
         puntaje -= min(3.0, 0.1 * len(prints_detectados))
-        faltantes.append(Hallazgo("P1", "D", "Uso de print detectado", "Reemplazar print por logging", prints_detectados[0]))
+        faltantes.append(
+            Hallazgo(
+                "P1",
+                "D",
+                f"Uso de print detectado fuera de tests (total={len(prints_detectados)})",
+                "Reemplazar print por logging",
+                prints_detectados[0],
+            )
+        )
+        evidencias.extend([f"print detectado -> {item}" for item in prints_detectados])
 
     puntaje = max(0.0, round(puntaje, 2))
     estado = "PASS" if not any(h.prioridad == "P0" for h in faltantes) else "FAIL"
