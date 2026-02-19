@@ -153,7 +153,7 @@ class AuditarProyectoGenerado:
             )
         except FileNotFoundError:
             return ["pytest no está disponible en el entorno; se omite validación opcional."]
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
             return [f"No se pudo ejecutar pytest de forma opcional: {exc}"]
 
         if resultado.returncode != 0:

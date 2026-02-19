@@ -10,9 +10,10 @@ import logging
 from pathlib import Path
 import re
 
-from aplicacion.errores import ErrorAuditoria
+from aplicacion.errores import ErrorAuditoria, ErrorInfraestructura
 from aplicacion.puertos.calculadora_hash_puerto import CalculadoraHashPuerto
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos
+from dominio.errores import ErrorDominio
 
 LOGGER = logging.getLogger(__name__)
 
@@ -115,8 +116,10 @@ class AuditarProyectoGenerado:
                 cobertura=cobertura,
                 resumen=resumen,
             )
-        except Exception as exc:
-            LOGGER.error("Fallo inesperado en auditoría: %s", exc, exc_info=True)
+        except ErrorDominio:
+            raise
+        except (ErrorInfraestructura, OSError, ValueError, RuntimeError) as exc:
+            LOGGER.error("Fallo técnico en auditoría: %s", exc, exc_info=True)
             errores.append(f"Error de auditoría: {exc}")
             raise ErrorAuditoria(f"No fue posible completar la auditoría: {exc}") from exc
         finally:

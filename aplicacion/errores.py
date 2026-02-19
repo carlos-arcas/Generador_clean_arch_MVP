@@ -7,8 +7,16 @@ class ErrorAplicacion(Exception):
     """Base para errores de la capa de aplicación."""
 
 
-class ErrorValidacion(ErrorAplicacion):
+class ErrorValidacionEntrada(ErrorAplicacion):
     """Error de validación de datos o contratos de entrada."""
+
+
+class ErrorValidacion(ErrorValidacionEntrada):
+    """Alias compatible para validaciones de entrada en aplicación."""
+
+
+class ErrorGeneracionProyecto(ErrorAplicacion):
+    """Error funcional al orquestar la generación de un proyecto."""
 
 
 class ErrorConflictoArchivos(ErrorAplicacion):
@@ -21,3 +29,7 @@ class ErrorAuditoria(ErrorAplicacion):
 
 class ErrorBlueprintNoEncontrado(ErrorAplicacion):
     """Error cuando no existe el blueprint solicitado."""
+
+
+class ErrorInfraestructura(ErrorAplicacion):
+    """Error técnico proveniente de un adaptador de infraestructura."""

@@ -27,8 +27,10 @@ from aplicacion.casos_uso.generacion.pasos.preparar_estructura import Preparador
 from aplicacion.casos_uso.generacion.pasos.publicar_manifest import PublicadorManifestGeneracion
 from aplicacion.casos_uso.generacion.pasos.rollback_generacion import RollbackGeneracion
 from aplicacion.casos_uso.generacion.pasos.validar_entrada import ValidadorEntradaGeneracion
+from aplicacion.errores import ErrorGeneracionProyecto, ErrorInfraestructura
 from aplicacion.puertos.generador_manifest_puerto import GeneradorManifestPuerto
 from aplicacion.puertos.sistema_archivos import SistemaArchivos
+from dominio.errores import ErrorDominio
 from dominio.especificacion import EspecificacionProyecto
 
 LOGGER = logging.getLogger(__name__)
@@ -110,19 +112,16 @@ class GenerarProyectoMvp:
                 warnings=resultado_auditoria.warnings,
                 auditoria=resultado_auditoria,
             )
-        except ErrorPreparacionEstructuraGeneracion as exc:
-            self._rollback.ejecutar(ruta_proyecto, not carpeta_existia_antes)
-            raise ErrorPreparacionEstructuraGeneracion(str(exc)) from exc
-        except ErrorEjecucionPlanGeneracion as exc:
-            self._rollback.ejecutar(ruta_proyecto, carpeta_creada_en_ejecucion)
-            raise ErrorEjecucionPlanGeneracion(str(exc)) from exc
-        except ErrorPublicacionManifestGeneracion as exc:
-            self._rollback.ejecutar(ruta_proyecto, carpeta_creada_en_ejecucion)
-            raise ErrorPublicacionManifestGeneracion(str(exc)) from exc
-        except ErrorAuditoriaGeneracion as exc:
-            self._rollback.ejecutar(ruta_proyecto, carpeta_creada_en_ejecucion)
-            raise ErrorAuditoriaGeneracion(str(exc)) from exc
-        except ErrorValidacionEntradaGeneracion:
+        except (ErrorValidacionEntradaGeneracion, ErrorNormalizacionEntradaGeneracion, ErrorDominio):
             raise
-        except ErrorNormalizacionEntradaGeneracion:
-            raise
+        except (
+            ErrorPreparacionEstructuraGeneracion,
+            ErrorEjecucionPlanGeneracion,
+            ErrorPublicacionManifestGeneracion,
+            ErrorAuditoriaGeneracion,
+            ErrorInfraestructura,
+            OSError,
+            ValueError,
+        ) as exc:
+            self._rollback.ejecutar(ruta_proyecto, carpeta_creada_en_ejecucion or not carpeta_existia_antes)
+            raise ErrorGeneracionProyecto("Falló la generación del proyecto MVP.") from exc
