@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 from aplicacion.errores import ErrorAplicacion, ErrorInfraestructura
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvp, GenerarProyectoMvpEntrada
+from presentacion.mapeo_mensajes_error import MensajeUxError, mapear_error_a_mensaje_ux
+from presentacion.ux.id_incidente import generar_id_incidente
 
 LOGGER = logging.getLogger(__name__)
 
@@ -17,7 +20,7 @@ class SenalesTrabajadorGeneracionMvp(QObject):
 
     progreso = Signal(str)
     exito = Signal(object)
-    error = Signal(str, str)
+    error = Signal(object)
 
 
 class TrabajadorGeneracionMvp(QRunnable):
@@ -27,7 +30,14 @@ class TrabajadorGeneracionMvp(QRunnable):
         super().__init__()
         self._caso_uso = caso_uso
         self._entrada = entrada
+        self._ruta_logs = Path("logs")
         self.senales = SenalesTrabajadorGeneracionMvp()
+
+    def _emitir_error_mapeado(self, exc: Exception) -> None:
+        id_incidente = generar_id_incidente()
+        LOGGER.error("Fallo en trabajador de generación id_incidente=%s", id_incidente, exc_info=True)
+        mensaje_ux: MensajeUxError = mapear_error_a_mensaje_ux(exc, id_incidente, self._ruta_logs)
+        self.senales.error.emit(mensaje_ux)
 
     def run(self) -> None:
         try:
@@ -39,17 +49,10 @@ class TrabajadorGeneracionMvp(QRunnable):
                 LOGGER.warning("Generación completada con auditoría inválida: %s", detalle)
             self.senales.exito.emit(salida)
         except ErrorInfraestructura as exc:
-            LOGGER.error("Fallo en trabajador de generación", exc_info=True)
-            self.senales.error.emit(
-                "No se pudo completar la generación del proyecto por un problema de infraestructura.",
-                str(exc),
-            )
+            self._emitir_error_mapeado(exc)
         except ErrorAplicacion as exc:
-            LOGGER.error("Fallo en trabajador de generación", exc_info=True)
-            self.senales.error.emit("No se pudo completar la generación del proyecto.", str(exc))
+            self._emitir_error_mapeado(exc)
         except OSError as exc:
-            LOGGER.error("Fallo en trabajador de generación", exc_info=True)
-            self.senales.error.emit("No se pudo completar la generación del proyecto.", str(exc))
+            self._emitir_error_mapeado(exc)
         except ValueError as exc:
-            LOGGER.error("Fallo en trabajador de generación", exc_info=True)
-            self.senales.error.emit("No se pudo completar la generación del proyecto.", str(exc))
+            self._emitir_error_mapeado(exc)

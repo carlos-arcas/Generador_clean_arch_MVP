@@ -546,10 +546,12 @@ def _evaluar_ux_minima(ruta_repo: Path) -> ResultadoSeccion:
         evidencias.append("Mapeo de errores a UX: FALTA")
         faltantes.append(Hallazgo("P1", "F", "No se encontró mapeo de mensajes de error", "Crear presentacion/mapeo_mensajes_error.py", "presentacion/mapeo_mensajes_error.py"))
 
-    patrones_genericos = ["falló mvp", "error inesperado", "algo salió mal", "ha ocurrido un error"]
+    patrones_genericos = ["falló mvp", "algo salió mal", "ha ocurrido un error"]
     hallazgos_genericos: list[str] = []
     for archivo in _iterar_archivos_python(ruta_repo):
         relativa = archivo.relative_to(ruta_repo).as_posix()
+        if not relativa.startswith("presentacion/"):
+            continue
         texto = _leer_texto_seguro(archivo).lower()
         for patron in patrones_genericos:
             if patron in texto:
@@ -560,12 +562,53 @@ def _evaluar_ux_minima(ruta_repo: Path) -> ResultadoSeccion:
         puntaje -= min(4.0, len(hallazgos_genericos) * 1.0)
         faltantes.append(Hallazgo("P1", "F", "Mensajes de error genéricos detectados", "Agregar códigos y causa accionable para usuario", hallazgos_genericos[0]))
 
-    faltantes.extend(
-        [
-            Hallazgo("P2", "F", "Recomendación UX: ID de incidente por operación", "Agregar correlación de incidente en pantalla", "presentacion/"),
-            Hallazgo("P2", "F", "Recomendación UX: botón copiar detalles/abrir logs", "Agregar acciones de soporte en UI", "presentacion/"),
-            Hallazgo("P2", "F", "Recomendación UX: estado cargando y re-habilitar botones", "Controlar estado durante operaciones", "presentacion/"),
-        ]
+    archivos_presentacion = list((ruta_repo / "presentacion").rglob("*.py")) if (ruta_repo / "presentacion").exists() else []
+    uso_mapeo = False
+    texto_usuario_con_id = False
+    for archivo in archivos_presentacion:
+        texto = _leer_texto_seguro(archivo)
+        if "mapear_error_a_mensaje_ux" in texto:
+            uso_mapeo = True
+        if (
+            "QMessageBox" in texto
+            and ("ID de incidente" in texto or "ID incidente" in texto or "ID:" in texto)
+        ):
+            texto_usuario_con_id = True
+
+    evidencias.append(f"Uso de mapeo en flujo de error: {'OK' if uso_mapeo else 'FALTA'}")
+    if not uso_mapeo:
+        puntaje -= 2.0
+        faltantes.append(
+            Hallazgo(
+                "P1",
+                "F",
+                "No se detectó uso de mapear_error_a_mensaje_ux en el flujo de error",
+                "Importar y utilizar el mapeo en trabajador o diálogo de error",
+                "presentacion/",
+            )
+        )
+
+    evidencias.append(f"Mensaje al usuario con ID incidente: {'OK' if texto_usuario_con_id else 'FALTA'}")
+    if not texto_usuario_con_id:
+        puntaje -= 1.5
+        faltantes.append(
+            Hallazgo(
+                "P1",
+                "F",
+                "No se detecta ID de incidente en texto mostrado al usuario",
+                "Incluir ID de incidente en el diálogo de error",
+                "presentacion/",
+            )
+        )
+
+    faltantes.append(
+        Hallazgo(
+            "P2",
+            "F",
+            "Recomendación UX: botón copiar detalles/abrir logs",
+            "Agregar acciones de soporte en UI",
+            "presentacion/",
+        )
     )
 
     puntaje = max(0.0, round(puntaje, 2))

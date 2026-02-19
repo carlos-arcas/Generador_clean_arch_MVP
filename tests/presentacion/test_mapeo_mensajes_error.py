@@ -1,58 +1,52 @@
-"""Pruebas unitarias para el mapeo de mensajes de error del wizard."""
+"""Pruebas unitarias del mapeo de errores a UX."""
 
 from __future__ import annotations
 
-import inspect
+from pathlib import Path
 
-from aplicacion.errores import ErrorGeneracionProyecto, ErrorValidacionEntrada
-from presentacion.wizard.orquestadores import orquestador_finalizacion_wizard as modulo
+from presentacion.mapeo_mensajes_error import (
+    MensajeUxError,
+    construir_texto_para_copiar,
+    mapear_error_a_mensaje_ux,
+)
 
 
-class ErrorDesconocido(Exception):
-    """Error ad-hoc para validar fallback de mapeo."""
-
-
-def _crear_orquestador() -> modulo.OrquestadorFinalizacionWizard:
-    return modulo.OrquestadorFinalizacionWizard(
-        validador_final=lambda proyecto: proyecto,
-        lanzador_generacion=lambda entrada: None,
+def test_mapear_error_permiso_da_mensaje_accionable() -> None:
+    mensaje = mapear_error_a_mensaje_ux(
+        PermissionError("sin permisos en carpeta"),
+        id_incidente="GEN-20260101-101010-ABCD",
+        ruta_logs=Path("logs"),
     )
 
-
-def test_mapear_mensaje_error_validacion() -> None:
-    orquestador = _crear_orquestador()
-
-    mensaje = orquestador._mapear_mensaje_error(ErrorValidacionEntrada("faltan datos"))
-
-    assert mensaje == "Error de validación: faltan datos"
+    assert mensaje.acciones
+    assert mensaje.causa_probable is not None
+    assert "falló mvp" not in mensaje.mensaje.lower()
 
 
-def test_mapear_mensaje_error_generacion() -> None:
-    orquestador = _crear_orquestador()
+def test_mapear_error_inesperado_incluye_id_y_detalle_copiable() -> None:
+    mensaje = mapear_error_a_mensaje_ux(
+        RuntimeError("error no controlado"),
+        id_incidente="GEN-20260101-101010-ABCD",
+        ruta_logs=Path("logs"),
+    )
 
-    mensaje = orquestador._mapear_mensaje_error(ErrorGeneracionProyecto("falló pipeline"))
-
-    assert mensaje == "Error al iniciar generación: falló pipeline"
-
-
-def test_mapear_mensaje_error_oserror() -> None:
-    orquestador = _crear_orquestador()
-
-    mensaje = orquestador._mapear_mensaje_error(OSError("sin permisos"))
-
-    assert mensaje == "Error técnico al iniciar generación."
+    assert "GEN-20260101-101010-ABCD" in mensaje.mensaje
+    assert mensaje.detalle_tecnico is not None
 
 
-def test_mapear_mensaje_error_desconocido() -> None:
-    orquestador = _crear_orquestador()
+def test_construir_texto_para_copiar_incluye_id_y_ruta_logs() -> None:
+    mensaje = MensajeUxError(
+        titulo="Error inesperado",
+        mensaje="Ocurrió un problema",
+        causa_probable="Fallo interno",
+        acciones=["Reintentar"],
+        id_incidente="GEN-20260101-101010-ABCD",
+        detalle_tecnico="traceback...",
+        ruta_logs="logs",
+    )
 
-    mensaje = orquestador._mapear_mensaje_error(ErrorDesconocido("sin mapeo"))
+    texto = construir_texto_para_copiar(mensaje)
 
-    assert mensaje == "Error técnico al iniciar generación."
-
-
-def test_mapear_mensaje_error_complejidad_reducida() -> None:
-    codigo = inspect.getsource(modulo.OrquestadorFinalizacionWizard._mapear_mensaje_error)
-
-    assert "MAPEO_ERRORES_A_MENSAJES" in codigo
-    assert codigo.count("if isinstance") == 1
+    assert "GEN-20260101-101010-ABCD" in texto
+    assert "logs" in texto
+    assert "traceback..." in texto

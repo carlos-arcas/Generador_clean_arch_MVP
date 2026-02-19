@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from PySide6.QtCore import QThreadPool
 from PySide6.QtWidgets import (
+    QAbstractButton,
     QInputDialog,
     QLabel,
     QMessageBox,
@@ -24,6 +26,8 @@ from aplicacion.casos_uso.presets import CargarPresetProyecto, GuardarPresetProy
 from aplicacion.casos_uso.seguridad import GuardarCredencial
 from aplicacion.dtos.proyecto import DtoAtributo, DtoClase, DtoProyectoEntrada
 from aplicacion.errores import ErrorInfraestructura, ErrorValidacionEntrada
+from presentacion.mapeo_mensajes_error import MensajeUxError, construir_texto_para_copiar
+from presentacion.ux.acciones_soporte import abrir_carpeta_logs, copiar_a_portapapeles
 from presentacion.wizard.dtos import DatosWizardProyecto
 from presentacion.wizard.orquestadores.orquestador_finalizacion_wizard import (
     DtoEntradaFinalizacionWizard,
@@ -354,11 +358,40 @@ class WizardGeneradorProyectos(QWizard):
             f"{mensaje}\n\nSe detectaron errores críticos de auditoría:\n{detalle}",
         )
 
-    def _on_generacion_error(self, mensaje: str, detalle: str) -> None:
+    def _on_generacion_error(self, mensaje_ux: MensajeUxError) -> None:
         self._cambiar_estado_generando(False, "")
-        LOGGER.error("Falló la generación desde wizard: %s | detalle=%s", mensaje, detalle)
-        QMessageBox.critical(
-            self,
-            "Error de generación",
-            f"{mensaje}\n\nDetalle:\n{detalle}",
+        LOGGER.error(
+            "Error mostrado en wizard id_incidente=%s titulo=%s",
+            mensaje_ux.id_incidente,
+            mensaje_ux.titulo,
         )
+        self._mostrar_dialogo_error_generacion(mensaje_ux)
+
+    def _mostrar_dialogo_error_generacion(self, mensaje_ux: MensajeUxError) -> None:
+        cuadro = QMessageBox(self)
+        cuadro.setIcon(QMessageBox.Critical)
+        cuadro.setWindowTitle(mensaje_ux.titulo)
+        cuadro.setText(mensaje_ux.mensaje)
+
+        texto_informativo = f"ID de incidente: {mensaje_ux.id_incidente}"
+        if mensaje_ux.causa_probable:
+            texto_informativo += f"\nCausa probable: {mensaje_ux.causa_probable}"
+        if mensaje_ux.acciones:
+            texto_informativo += "\nAcciones recomendadas:\n" + "\n".join(
+                f"• {accion}" for accion in mensaje_ux.acciones
+            )
+        cuadro.setInformativeText(texto_informativo)
+
+        if mensaje_ux.detalle_tecnico:
+            cuadro.setDetailedText(mensaje_ux.detalle_tecnico)
+
+        boton_copiar = cuadro.addButton("Copiar detalles", QMessageBox.ActionRole)
+        boton_logs = cuadro.addButton("Abrir logs", QMessageBox.ActionRole)
+        cuadro.addButton("Cerrar", QMessageBox.AcceptRole)
+
+        cuadro.exec()
+        boton_pulsado: QAbstractButton | None = cuadro.clickedButton()
+        if boton_pulsado is boton_copiar:
+            copiar_a_portapapeles(construir_texto_para_copiar(mensaje_ux))
+        if boton_pulsado is boton_logs and mensaje_ux.ruta_logs:
+            abrir_carpeta_logs(Path(mensaje_ux.ruta_logs))
