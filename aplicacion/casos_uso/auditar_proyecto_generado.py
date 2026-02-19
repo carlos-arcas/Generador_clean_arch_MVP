@@ -14,6 +14,7 @@ from aplicacion.casos_uso.auditoria.validadores import ContextoAuditoria, Valida
 from aplicacion.errores import ErrorAuditoria, ErrorInfraestructura
 from aplicacion.puertos.calculadora_hash_puerto import CalculadoraHashPuerto
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos
+from aplicacion.validacion import MotorValidacion, ReglaValidacion, ResultadoValidacion
 from dominio.errores import ErrorDominio
 
 LOGGER = logging.getLogger(__name__)
@@ -58,6 +59,79 @@ class _CalculadoraHashLocal:
         return digestor.hexdigest()
 
 
+@dataclass(frozen=True)
+class _ContextoReglasAuditoria:
+    base: Path
+    blueprints: list[str]
+    estructura_requerida: list[str]
+    validadores: list[ValidadorAuditoria]
+    calculadora_hash: CalculadoraHashPuerto
+
+
+class _ReglaRecursoObligatorio(ReglaValidacion):
+    def __init__(self, ruta_relativa: str, mensaje_error: str) -> None:
+        self._ruta_relativa = ruta_relativa
+        self._mensaje_error = mensaje_error
+
+    def validar(self, contexto: _ContextoReglasAuditoria) -> ResultadoValidacion | None:
+        if (contexto.base / self._ruta_relativa).exists():
+            return None
+        return ResultadoValidacion(False, self._mensaje_error, "ERROR")
+
+
+class _ReglaValidadorArquitecturaIndividual(ReglaValidacion):
+    def __init__(self, validador: ValidadorAuditoria) -> None:
+        self._validador = validador
+
+    def validar(self, contexto: _ContextoReglasAuditoria) -> ResultadoValidacion | None:
+        auditoria = ContextoAuditoria(base=contexto.base)
+        resultado = self._validador.validar(auditoria)
+        if not resultado.errores:
+            return None
+        return ResultadoValidacion(False, resultado.errores[0], "ERROR")
+
+
+class _ReglaDependenciasInformes(ReglaValidacion):
+    def validar(self, contexto: _ContextoReglasAuditoria) -> ResultadoValidacion | None:
+        if not any(nombre in {"export_excel", "export_pdf"} for nombre in contexto.blueprints):
+            return None
+        ruta = contexto.base / "requirements.txt"
+        if not ruta.exists():
+            return ResultadoValidacion(False, "No existe requirements.txt y se solicitaron blueprints de informes.", "ERROR")
+        contenido = ruta.read_text(encoding="utf-8").lower()
+        if "openpyxl" not in contenido:
+            return ResultadoValidacion(False, "requirements.txt no incluye openpyxl para exportación Excel.", "ERROR")
+        if "reportlab" not in contenido:
+            return ResultadoValidacion(False, "requirements.txt no incluye reportlab para exportación PDF.", "ERROR")
+        return None
+
+
+class _ReglaConsistenciaManifest(ReglaValidacion):
+    def validar(self, contexto: _ContextoReglasAuditoria) -> ResultadoValidacion | None:
+        ruta_manifest = contexto.base / "manifest.json"
+        if not ruta_manifest.exists():
+            return None
+        payload = json.loads(ruta_manifest.read_text(encoding="utf-8"))
+        for entrada in payload.get("archivos", []):
+            error = self._validar_entrada_manifest(contexto, entrada)
+            if error is not None:
+                return ResultadoValidacion(False, error, "ERROR")
+        return None
+
+    def _validar_entrada_manifest(self, contexto: _ContextoReglasAuditoria, entrada: dict[str, str]) -> str | None:
+        ruta_relativa = entrada.get("ruta_relativa", "")
+        hash_esperado = entrada.get("hash_sha256", "")
+        if not ruta_relativa or not hash_esperado:
+            return "manifest.json contiene entradas incompletas."
+        ruta_archivo = contexto.base / ruta_relativa
+        if not ruta_archivo.exists():
+            return f"manifest.json referencia archivo inexistente: {ruta_relativa}"
+        hash_actual = contexto.calculadora_hash.calcular_hash_archivo(ruta_archivo)
+        if hash_actual != hash_esperado:
+            return f"Hash inconsistente para {ruta_relativa} en manifest.json"
+        return None
+
+
 class AuditarProyectoGenerado:
     """Verifica reglas de calidad para el proyecto generado."""
 
@@ -82,18 +156,30 @@ class AuditarProyectoGenerado:
         self._ejecutor_procesos = ejecutor_procesos
         self._calculadora_hash = calculadora_hash or _CalculadoraHashLocal()
         self._validadores_auditoria = self._crear_validadores_auditoria()
+        self._motor_validacion = MotorValidacion(self._crear_reglas_base())
 
     def _crear_validadores_auditoria(self) -> list[ValidadorAuditoria]:
         return [ValidadorImports()]
 
-    def _ejecutar_validadores(self, base: Path) -> list[str]:
-        LOGGER.info("Evaluando validadores modulares de auditoría")
-        contexto = ContextoAuditoria(base=base)
-        errores: list[str] = []
+    def _crear_reglas_base(self) -> list[ReglaValidacion]:
+        reglas: list[ReglaValidacion] = []
+        for recurso in self.ESTRUCTURA_REQUERIDA:
+            reglas.append(_ReglaRecursoObligatorio(recurso, f"No existe el recurso obligatorio: {recurso}"))
         for validador in self._validadores_auditoria:
-            resultado = validador.validar(contexto)
-            errores.extend(resultado.errores)
-        return errores
+            reglas.append(_ReglaValidadorArquitecturaIndividual(validador))
+        reglas.extend(
+            [
+                _ReglaRecursoObligatorio(
+                    "infraestructura/logging_config.py",
+                    "No existe configuración de logging en infraestructura/logging_config.py",
+                ),
+                _ReglaRecursoObligatorio("logs/seguimiento.log", "No existe logs/seguimiento.log"),
+                _ReglaRecursoObligatorio("logs/crashes.log", "No existe logs/crashes.log"),
+                _ReglaDependenciasInformes(),
+                _ReglaConsistenciaManifest(),
+            ]
+        )
+        return reglas
 
     def ejecutar(self, ruta_proyecto: str, blueprints_usados: list[str] | None = None) -> ResultadoAuditoria:
         """Ejecuta las validaciones obligatorias sobre un proyecto ya generado."""
@@ -129,11 +215,16 @@ class AuditarProyectoGenerado:
         return _EstadoAuditoria(errores=[], blueprints=blueprints_usados or [])
 
     def _validar_reglas_base(self, base: Path, estado: _EstadoAuditoria) -> None:
-        estado.errores.extend(self._validar_estructura(base))
-        estado.errores.extend(self._ejecutar_validadores(base))
-        estado.errores.extend(self._validar_logging(base))
-        estado.errores.extend(self._validar_dependencias_informes(base, estado.blueprints))
-        estado.errores.extend(self._validar_consistencia_manifest(base))
+        contexto = _ContextoReglasAuditoria(
+            base=base,
+            blueprints=estado.blueprints,
+            estructura_requerida=self.ESTRUCTURA_REQUERIDA,
+            validadores=self._validadores_auditoria,
+            calculadora_hash=self._calculadora_hash,
+        )
+        for resultado in self._motor_validacion.ejecutar(contexto):
+            if resultado.severidad == "ERROR" and not resultado.exito and resultado.mensaje:
+                estado.errores.append(resultado.mensaje)
 
     def _ejecutar_pytest_y_cobertura(self, base: Path, estado: _EstadoAuditoria) -> None:
         estado.resultado_pytest = self._ejecutor_procesos.ejecutar(
@@ -167,63 +258,6 @@ class AuditarProyectoGenerado:
             cobertura=estado.cobertura,
             resumen=resumen,
         )
-
-    def _validar_estructura(self, base: Path) -> list[str]:
-        LOGGER.info("Evaluando reglas de estructura")
-        errores: list[str] = []
-        for relativo in self.ESTRUCTURA_REQUERIDA:
-            if not (base / relativo).exists():
-                errores.append(f"No existe el recurso obligatorio: {relativo}")
-        return errores
-
-    def _validar_dependencias_informes(self, base: Path, blueprints: list[str]) -> list[str]:
-        blueprints_informes = {"export_excel", "export_pdf"}
-        if not any(nombre in blueprints_informes for nombre in blueprints):
-            return []
-
-        ruta_requirements = base / "requirements.txt"
-        if not ruta_requirements.exists():
-            return ["No existe requirements.txt y se solicitaron blueprints de informes."]
-
-        contenido = ruta_requirements.read_text(encoding="utf-8").lower()
-        errores: list[str] = []
-        if "openpyxl" not in contenido:
-            errores.append("requirements.txt no incluye openpyxl para exportación Excel.")
-        if "reportlab" not in contenido:
-            errores.append("requirements.txt no incluye reportlab para exportación PDF.")
-        return errores
-
-    def _validar_consistencia_manifest(self, base: Path) -> list[str]:
-        ruta_manifest = base / "manifest.json"
-        if not ruta_manifest.exists():
-            return []
-        payload = json.loads(ruta_manifest.read_text(encoding="utf-8"))
-        errores: list[str] = []
-        for entrada in payload.get("archivos", []):
-            ruta_relativa = entrada.get("ruta_relativa", "")
-            hash_esperado = entrada.get("hash_sha256", "")
-            if not ruta_relativa or not hash_esperado:
-                errores.append("manifest.json contiene entradas incompletas.")
-                continue
-            ruta_archivo = base / ruta_relativa
-            if not ruta_archivo.exists():
-                errores.append(f"manifest.json referencia archivo inexistente: {ruta_relativa}")
-                continue
-            hash_actual = self._calculadora_hash.calcular_hash_archivo(ruta_archivo)
-            if hash_actual != hash_esperado:
-                errores.append(f"Hash inconsistente para {ruta_relativa} en manifest.json")
-        return errores
-
-    def _validar_logging(self, base: Path) -> list[str]:
-        LOGGER.info("Evaluando reglas de logging")
-        errores: list[str] = []
-        if not (base / "infraestructura" / "logging_config.py").exists():
-            errores.append("No existe configuración de logging en infraestructura/logging_config.py")
-        if not (base / "logs" / "seguimiento.log").exists():
-            errores.append("No existe logs/seguimiento.log")
-        if not (base / "logs" / "crashes.log").exists():
-            errores.append("No existe logs/crashes.log")
-        return errores
 
     def _extraer_cobertura_total(self, salida: str) -> float | None:
         coincidencias = re.findall(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", salida)
