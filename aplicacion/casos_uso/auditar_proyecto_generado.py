@@ -36,6 +36,17 @@ class ResultadoComando:
     stderr: str
 
 
+@dataclass
+class _EstadoAuditoria:
+    errores: list[str]
+    blueprints: list[str]
+    resultado_pytest: ResultadoComando = field(
+        default_factory=lambda: ResultadoComando(codigo_salida=1, stdout="No ejecutado", stderr="")
+    )
+    cobertura: float | None = None
+    conclusion: str = "RECHAZADO"
+
+
 class _CalculadoraHashLocal:
     """Fallback temporal para evitar dependencia directa de infraestructura."""
 
@@ -86,65 +97,76 @@ class AuditarProyectoGenerado:
 
     def ejecutar(self, ruta_proyecto: str, blueprints_usados: list[str] | None = None) -> ResultadoAuditoria:
         """Ejecuta las validaciones obligatorias sobre un proyecto ya generado."""
-        base = Path(ruta_proyecto)
-        errores: list[str] = []
-        blueprints = blueprints_usados or []
-        resultado_pytest = ResultadoComando(codigo_salida=1, stdout="No ejecutado", stderr="")
-        cobertura: float | None = None
-        conclusion = "RECHAZADO"
+        base = self._construir_base_proyecto(ruta_proyecto)
+        estado = self._crear_estado_auditoria(blueprints_usados)
         LOGGER.info("Inicio auditoría avanzada proyecto=%s", ruta_proyecto)
 
         try:
-            errores.extend(self._validar_estructura(base))
-            errores.extend(self._ejecutar_validadores(base))
-            errores.extend(self._validar_logging(base))
-            errores.extend(self._validar_dependencias_informes(base, blueprints))
-            errores.extend(self._validar_consistencia_manifest(base))
-
-            resultado_pytest = self._ejecutor_procesos.ejecutar(
-                comando=["pytest", "--cov=.", "--cov-report=term"],
-                cwd=str(base),
-            )
-            cobertura = self._extraer_cobertura_total(resultado_pytest.stdout)
-            if cobertura is None:
-                errores.append("No fue posible extraer el porcentaje total de cobertura de pytest.")
-            elif cobertura < 85.0:
-                errores.append(f"Cobertura insuficiente: {cobertura:.2f}% (mínimo requerido: 85%).")
-
-            if resultado_pytest.codigo_salida != 0 and cobertura is None:
-                errores.append("La ejecución de pytest finalizó con error y sin reporte de cobertura usable.")
-
-            LOGGER.info("Cobertura total detectada: %s", cobertura)
-            LOGGER.info("Errores de auditoría detectados: %s", errores)
-
-            valido = not errores
-            conclusion = "APROBADO" if valido else "RECHAZADO"
-            resumen = (
-                f"Auditoría {conclusion}. "
-                f"Errores: {len(errores)}. "
-                f"Cobertura: {f'{cobertura:.2f}%' if cobertura is not None else 'no disponible'}."
-            )
-            return ResultadoAuditoria(
-                valido=valido,
-                lista_errores=errores,
-                cobertura=cobertura,
-                resumen=resumen,
-            )
+            self._validar_reglas_base(base, estado)
+            self._ejecutar_pytest_y_cobertura(base, estado)
+            self._registrar_resumen_auditoria(estado)
+            return self._construir_resultado_auditoria(estado)
         except ErrorDominio:
             raise
         except (ErrorInfraestructura, OSError, ValueError, RuntimeError) as exc:
             LOGGER.error("Fallo técnico en auditoría: %s", exc, exc_info=True)
-            errores.append(f"Error de auditoría: {exc}")
+            estado.errores.append(f"Error de auditoría: {exc}")
             raise ErrorAuditoria(f"No fue posible completar la auditoría: {exc}") from exc
         finally:
             self._escribir_informe(
                 base=base,
-                blueprints=blueprints,
-                errores=errores,
-                cobertura=cobertura,
-                resultado_pytest=resultado_pytest,
-                conclusion=conclusion,
+                blueprints=estado.blueprints,
+                errores=estado.errores,
+                cobertura=estado.cobertura,
+                resultado_pytest=estado.resultado_pytest,
+                conclusion=estado.conclusion,
             )
+
+    def _construir_base_proyecto(self, ruta_proyecto: str) -> Path:
+        return Path(ruta_proyecto)
+
+    def _crear_estado_auditoria(self, blueprints_usados: list[str] | None) -> _EstadoAuditoria:
+        return _EstadoAuditoria(errores=[], blueprints=blueprints_usados or [])
+
+    def _validar_reglas_base(self, base: Path, estado: _EstadoAuditoria) -> None:
+        estado.errores.extend(self._validar_estructura(base))
+        estado.errores.extend(self._ejecutar_validadores(base))
+        estado.errores.extend(self._validar_logging(base))
+        estado.errores.extend(self._validar_dependencias_informes(base, estado.blueprints))
+        estado.errores.extend(self._validar_consistencia_manifest(base))
+
+    def _ejecutar_pytest_y_cobertura(self, base: Path, estado: _EstadoAuditoria) -> None:
+        estado.resultado_pytest = self._ejecutor_procesos.ejecutar(
+            comando=["pytest", "--cov=.", "--cov-report=term"],
+            cwd=str(base),
+        )
+        estado.cobertura = self._extraer_cobertura_total(estado.resultado_pytest.stdout)
+        if estado.cobertura is None:
+            estado.errores.append("No fue posible extraer el porcentaje total de cobertura de pytest.")
+        elif estado.cobertura < 85.0:
+            estado.errores.append(f"Cobertura insuficiente: {estado.cobertura:.2f}% (mínimo requerido: 85%).")
+
+        if estado.resultado_pytest.codigo_salida != 0 and estado.cobertura is None:
+            estado.errores.append("La ejecución de pytest finalizó con error y sin reporte de cobertura usable.")
+
+    def _registrar_resumen_auditoria(self, estado: _EstadoAuditoria) -> None:
+        LOGGER.info("Cobertura total detectada: %s", estado.cobertura)
+        LOGGER.info("Errores de auditoría detectados: %s", estado.errores)
+
+    def _construir_resultado_auditoria(self, estado: _EstadoAuditoria) -> ResultadoAuditoria:
+        valido = not estado.errores
+        estado.conclusion = "APROBADO" if valido else "RECHAZADO"
+        resumen = (
+            f"Auditoría {estado.conclusion}. "
+            f"Errores: {len(estado.errores)}. "
+            f"Cobertura: {f'{estado.cobertura:.2f}%' if estado.cobertura is not None else 'no disponible'}."
+        )
+        return ResultadoAuditoria(
+            valido=valido,
+            lista_errores=estado.errores,
+            cobertura=estado.cobertura,
+            resumen=resumen,
+        )
 
     def _validar_estructura(self, base: Path) -> list[str]:
         LOGGER.info("Evaluando reglas de estructura")
@@ -258,4 +280,3 @@ class AuditarProyectoGenerado:
                 contenido += f"- {error}\n"
 
         ruta_informe.write_text(contenido, encoding="utf-8")
-
