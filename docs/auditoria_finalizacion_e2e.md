@@ -6,17 +6,27 @@
 - Ruta evidencias: `docs/evidencias_finalizacion/AUD-20260219-124556-3614`
 - Preset: `/tmp/preset_auditoria_real.json`
 
+## Estado global
+
+```text
+Estado global: FAIL
+Tipo fallo dominante: CONFLICTO
+Código: CON-001
+Etapa: Preflight conflictos de rutas
+Motivo resumido: Se detectaron rutas duplicadas entre blueprints. Acción: desactiva uno de los blueprints que generan la misma ruta (p.ej. CRUD persona duplicado)
+```
+
 ## Tabla de etapas
 
 | Etapa | Estado | Duración ms | Resumen |
 |---|---|---:|---|
-| Preparación | PASS | 0 | Contexto listo |
-| Carga preset | PASS | 0 | Blueprints: 2 |
-| Preflight validación entrada | FAIL | 8 | Validación de blueprint fallida |
-| Preflight conflictos de rutas | SKIP | 0 | No ejecutada por fallo de validación |
-| Generación sandbox | SKIP | 0 | No ejecutada por fallo de validación |
-| Auditoría arquitectura | SKIP | 0 | No ejecutada por fallo de validación |
-| Smoke test | SKIP | 0 | No ejecutada por fallo de validación |
+| Preparación | PASS | 2 | Contexto listo |
+| Carga preset | PASS | 1 | Blueprints: 3 |
+| Preflight validación entrada | PASS | 1 | Validación de entrada OK |
+| Preflight conflictos de rutas | FAIL | 5 | Rutas duplicadas detectadas |
+| Generación sandbox | SKIP | 0 | No ejecutada por conflicto de rutas |
+| Auditoría arquitectura | SKIP | 0 | No ejecutada por conflicto de rutas |
+| Smoke test | SKIP | 0 | No ejecutada por conflicto de rutas |
 
 ## Evidencias por etapa
 
@@ -30,21 +40,33 @@ Evidencias: docs/evidencias_finalizacion/AUD-20260219-124556-3614
 ```text
 crud_json
 crud_sqlite
+api_fastapi
 ```
 
 ### Preflight Validacion Entrada
 ```text
-excepcion_tipo: ErrorValidacionDominio
-excepcion_mensaje: El blueprint crud_json requiere al menos una clase en la especificación.
-origen: auditar_finalizacion_proyecto.py:_preflight_validacion_entrada:257
-stacktrace_recortado:
-Traceback (most recent call last):
-  ...
+Warnings declarativos:
+- Incompatibilidad declarativa detectada: crud_json y crud_sqlite generan CRUD para la misma entidad. Recomendación: elige 1 CRUD.
 ```
 
 ### Preflight Conflictos Rutas
 ```text
-No ejecutada
+total rutas duplicadas: 2
+Ejemplos ruta -> [blueprints]:
+aplicacion/persona.py -> [crud_json, crud_sqlite]
+infraestructura/repositorio_persona.py -> [crud_json, crud_sqlite]
+
+Recomendación: No selecciones más de 1 blueprint CRUD para la misma entidad.
+
+excepcion_tipo: ErrorConflictoArchivos
+excepcion_mensaje: Rutas duplicadas detectadas: 2
+origen: auditar_finalizacion_proyecto.py:_preflight_conflictos_rutas:287
+linea_raise: auditar_finalizacion_proyecto.py:287
+stacktrace_recortado:
+Traceback (most recent call last):
+  File ".../aplicacion/casos_uso/auditar_finalizacion_proyecto.py", line 287, in _preflight_conflictos_rutas
+    raise ErrorConflictoArchivos("Rutas duplicadas detectadas: 2")
+aplicacion.errores.errores_generacion.ErrorConflictoArchivos: Rutas duplicadas detectadas: 2
 ```
 
 ### Generacion Sandbox
@@ -65,11 +87,24 @@ No ejecutada
 ## Diagnóstico y recomendación
 
 ```text
-Fallo de validación.
-Etapa: Preflight validación entrada
-Código: VAL-001
-Tipo: VALIDACION
-Mensaje: crud_json requiere al menos una clase. Blueprint culpable: crud_json. Regla: requiere al menos 1 clase. Acción: añade al menos una clase en la especificación o elimina crud_json del preset
+Conflicto de generación.
+Etapa: Preflight conflictos de rutas
+Código: CON-001
+Tipo: CONFLICTO
+Mensaje: Se detectaron rutas duplicadas entre blueprints. Acción: desactiva uno de los blueprints que generan la misma ruta (p.ej. CRUD persona duplicado)
+Mapa ruta -> [blueprints]:
+- aplicacion/persona.py -> [crud_json, crud_sqlite]
+- infraestructura/repositorio_persona.py -> [crud_json, crud_sqlite]
+Detalle técnico:
+excepcion_tipo: ErrorConflictoArchivos
+excepcion_mensaje: Rutas duplicadas detectadas: 2
+origen: auditar_finalizacion_proyecto.py:_preflight_conflictos_rutas:287
+linea_raise: auditar_finalizacion_proyecto.py:287
+stacktrace_recortado:
+Traceback (most recent call last):
+  File ".../aplicacion/casos_uso/auditar_finalizacion_proyecto.py", line 287, in _preflight_conflictos_rutas
+    raise ErrorConflictoArchivos("Rutas duplicadas detectadas: 2")
+aplicacion.errores.errores_generacion.ErrorConflictoArchivos: Rutas duplicadas detectadas: 2
 ```
 
 ## Comandos de reproducción

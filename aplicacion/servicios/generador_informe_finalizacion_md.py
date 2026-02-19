@@ -31,6 +31,7 @@ def generar_markdown(salida: DtoAuditoriaFinalizacionSalida) -> str:
         evidencias.append(f"### {titulo}\n```text\n{texto}\n```")
 
     diagnostico = _diagnostico(salida)
+    estado_global = _estado_global(salida)
 
     return (
         "# Auditoría de finalización E2E (informe real)\n\n"
@@ -39,6 +40,14 @@ def generar_markdown(salida: DtoAuditoriaFinalizacionSalida) -> str:
         f"- Ruta sandbox absoluta: `{salida.ruta_sandbox}`\n"
         f"- Ruta evidencias: `{ruta_evidencias}`\n"
         f"- Preset: `{preset}`\n\n"
+        "## Estado global\n\n"
+        "```text\n"
+        f"Estado global: {estado_global['estado']}\n"
+        f"Tipo fallo dominante: {estado_global['tipo_fallo']}\n"
+        f"Código: {estado_global['codigo']}\n"
+        f"Etapa: {estado_global['etapa']}\n"
+        f"Motivo resumido: {estado_global['motivo']}\n"
+        "```\n\n"
         "## Tabla de etapas\n\n"
         "| Etapa | Estado | Duración ms | Resumen |\n|---|---|---:|---|\n"
         f"{filas}\n\n"
@@ -83,3 +92,22 @@ def _diagnostico(salida: DtoAuditoriaFinalizacionSalida) -> str:
         partes.append(f"ID incidente: {salida.evidencias.get('incidente_id')}")
 
     return "\n".join(partes)
+
+
+def _estado_global(salida: DtoAuditoriaFinalizacionSalida) -> dict[str, str]:
+    etapa_fail = next((etapa for etapa in salida.etapas if etapa.estado == "FAIL"), None)
+    if etapa_fail is None:
+        return {
+            "estado": "PASS",
+            "tipo_fallo": "N/A",
+            "codigo": "N/A",
+            "etapa": "N/A",
+            "motivo": "Ejecución sin fallos.",
+        }
+    return {
+        "estado": "FAIL",
+        "tipo_fallo": etapa_fail.tipo_fallo or INESPERADO,
+        "codigo": etapa_fail.codigo or "N/D",
+        "etapa": etapa_fail.nombre,
+        "motivo": etapa_fail.mensaje_usuario or etapa_fail.resumen,
+    }
