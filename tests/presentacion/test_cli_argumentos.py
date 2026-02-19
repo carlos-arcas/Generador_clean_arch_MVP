@@ -31,6 +31,24 @@ def test_parser_generar_reconoce_argumentos() -> None:
     )
 
 
+
+def test_parser_auditar_finalizacion_reconoce_argumentos() -> None:
+    parser = cli.construir_parser()
+
+    args = parser.parse_args([
+        "auditar-finalizacion",
+        "--preset",
+        "configuracion/presets/api_basica.json",
+        "--salida",
+        "tmp/auditoria",
+    ])
+
+    assert args == Namespace(
+        comando="auditar-finalizacion",
+        preset="configuracion/presets/api_basica.json",
+        salida="tmp/auditoria",
+    )
+
 def test_main_invoca_comando_generar(monkeypatch) -> None:
     monkeypatch.setattr(cli, "configurar_logging", lambda _: None)
     monkeypatch.setattr(cli, "construir_contenedor_cli", lambda: SimpleNamespace())

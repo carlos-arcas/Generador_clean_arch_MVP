@@ -7,6 +7,7 @@ import logging
 from aplicacion.errores import ErrorAplicacion, ErrorAuditoria
 from infraestructura.bootstrap import configurar_logging
 from infraestructura.bootstrap.bootstrap_cli import construir_contenedor_cli
+from presentacion.cli.comando_auditar_finalizacion import ejecutar_comando_auditar_finalizacion
 from presentacion.cli.comandos.comando_generar import ejecutar_comando_generar
 
 LOGGER = logging.getLogger(__name__)
@@ -33,6 +34,12 @@ def construir_parser() -> argparse.ArgumentParser:
     auditar = subparsers.add_parser("auditar", help="Audita un proyecto")
     auditar.add_argument("--proyecto", required=True, help="Ruta del proyecto generado")
 
+    auditar_finalizacion = subparsers.add_parser(
+        "auditar-finalizacion", help="Ejecuta auditoría E2E desde preset hasta sandbox"
+    )
+    auditar_finalizacion.add_argument("--preset", required=True, help="Ruta del preset en disco")
+    auditar_finalizacion.add_argument("--salida", required=True, help="Ruta sandbox de auditoría")
+
     return parser
 
 
@@ -54,6 +61,10 @@ def _ejecutar_auditar(args: argparse.Namespace, contenedor) -> int:
     return 0
 
 
+def _ejecutar_auditar_finalizacion(args: argparse.Namespace, contenedor) -> int:
+    return ejecutar_comando_auditar_finalizacion(args, contenedor)
+
+
 def main(argv: list[str] | None = None) -> int:
     configurar_logging("logs")
     parser = construir_parser()
@@ -66,6 +77,8 @@ def main(argv: list[str] | None = None) -> int:
             return _ejecutar_validar_preset(args, contenedor)
         if args.comando == "auditar":
             return _ejecutar_auditar(args, contenedor)
+        if args.comando == "auditar-finalizacion":
+            return _ejecutar_auditar_finalizacion(args, contenedor)
         parser.error("Comando no soportado")
     except (ErrorAplicacion, FileNotFoundError, ValueError) as exc:
         LOGGER.error("Error de ejecución CLI: %s", exc)
