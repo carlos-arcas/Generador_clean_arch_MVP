@@ -1,0 +1,1 @@
+El blueprint crud_json requiere al menos una clase en la especificación.

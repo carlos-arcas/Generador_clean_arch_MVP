@@ -82,6 +82,5 @@ def construir_contenedor_cli() -> ContenedorCli:
             ),
             auditor_arquitectura=auditor_arquitectura,
             ejecutor_procesos=puertos.ejecutor_procesos,
-            sistema_archivos=puertos.sistema_archivos,
         ),
     )

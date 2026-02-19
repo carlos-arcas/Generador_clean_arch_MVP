@@ -39,14 +39,14 @@ def test_parser_auditar_finalizacion_reconoce_argumentos() -> None:
         "auditar-finalizacion",
         "--preset",
         "configuracion/presets/api_basica.json",
-        "--salida",
+        "--sandbox",
         "tmp/auditoria",
     ])
 
     assert args == Namespace(
         comando="auditar-finalizacion",
         preset="configuracion/presets/api_basica.json",
-        salida="tmp/auditoria",
+        sandbox="tmp/auditoria",
     )
 
 def test_main_invoca_comando_generar(monkeypatch) -> None:
