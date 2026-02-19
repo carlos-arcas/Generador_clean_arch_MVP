@@ -4,19 +4,19 @@ from __future__ import annotations
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
-from dominio.especificacion import EspecificacionClase
+from presentacion.dtos import DtoClasePresentacion
 
 
 class ModeloClases(QAbstractTableModel):
-    """Expone una lista de ``EspecificacionClase`` en una tabla Qt."""
+    """Expone una lista de ``DtoClasePresentacion`` en una tabla Qt."""
 
     ENCABEZADOS = ["Nombre", "Cantidad atributos"]
 
-    def __init__(self, clases: list[EspecificacionClase] | None = None) -> None:
+    def __init__(self, clases: list[DtoClasePresentacion] | None = None) -> None:
         super().__init__()
         self._clases = clases or []
 
-    def actualizar(self, clases: list[EspecificacionClase]) -> None:
+    def actualizar(self, clases: list[DtoClasePresentacion]) -> None:
         self.beginResetModel()
         self._clases = clases
         self.endResetModel()
@@ -54,7 +54,7 @@ class ModeloClases(QAbstractTableModel):
             return self.ENCABEZADOS[section]
         return str(section + 1)
 
-    def clase_en_fila(self, fila: int) -> EspecificacionClase | None:
+    def clase_en_fila(self, fila: int) -> DtoClasePresentacion | None:
         if fila < 0 or fila >= len(self._clases):
             return None
         return self._clases[fila]
