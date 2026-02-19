@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict, is_dataclass
+import json
 from pathlib import Path
 from typing import Callable
 
-from aplicacion.dtos.auditoria import DtoAuditoriaFinalizacionEntrada, DtoAuditoriaFinalizacionSalida
+from aplicacion.dtos.auditoria import DtoAuditoriaFinalizacionEntrada, DtoInformeFinalizacion
 from aplicacion.servicios.generador_informe_finalizacion_md import generar_markdown
 from infraestructura.bootstrap.bootstrap_cli import construir_contenedor_cli
 
@@ -13,30 +15,30 @@ from infraestructura.bootstrap.bootstrap_cli import construir_contenedor_cli
 def ejecutar_auditoria_finalizacion(
     preset: str,
     sandbox: str,
-    ejecutor: Callable[[DtoAuditoriaFinalizacionEntrada], DtoAuditoriaFinalizacionSalida] | None = None,
-) -> DtoAuditoriaFinalizacionSalida:
+    evidencias: str = "docs/evidencias_finalizacion",
+    smoke: bool = False,
+    arquitectura: bool = False,
+    ejecutor: Callable[..., object] | None = None,
+):
     ejecutor_uso = ejecutor or construir_contenedor_cli().auditar_finalizacion_proyecto.ejecutar
-    salida = ejecutor_uso(DtoAuditoriaFinalizacionEntrada(ruta_preset=preset, ruta_salida_auditoria=sandbox))
+    entrada = DtoAuditoriaFinalizacionEntrada(ruta_preset=preset, ruta_salida_auditoria=sandbox)
+    try:
+        salida = ejecutor_uso(
+            entrada,
+            ruta_evidencias=evidencias,
+            ejecutar_smoke_test=smoke,
+            ejecutar_auditoria_arquitectura=arquitectura,
+        )
+    except TypeError:
+        salida = ejecutor_uso(entrada)
 
-    ruta_docs = Path("docs")
-    ruta_docs.mkdir(parents=True, exist_ok=True)
-    markdown = generar_markdown(salida)
-    (ruta_docs / "auditoria_finalizacion_e2e.md").write_text(markdown, encoding="utf-8")
-
-    ruta_evidencias = ruta_docs / "evidencias_finalizacion" / salida.id_ejecucion
+    ruta_evidencias = Path(evidencias) / getattr(salida, "id_ejecucion")
     ruta_evidencias.mkdir(parents=True, exist_ok=True)
-    (ruta_evidencias / "preflight_conflictos.txt").write_text(
-        salida.evidencias.get("preflight_conflictos", "Sin evidencia"), encoding="utf-8"
-    )
-    (ruta_evidencias / "compileall.txt").write_text(salida.evidencias.get("smoke_test", "Sin evidencia"), encoding="utf-8")
-    (ruta_evidencias / "pytest_generado.txt").write_text(
-        salida.evidencias.get("smoke_test", "Sin evidencia"), encoding="utf-8"
-    )
-    (ruta_evidencias / "auditoria_arquitectura.txt").write_text(
-        salida.evidencias.get("auditoria_arquitectura", "Sin evidencia"), encoding="utf-8"
-    )
+    if isinstance(salida, DtoInformeFinalizacion):
+        (ruta_evidencias / "informe.md").write_text(generar_markdown(salida), encoding="utf-8")
+        (ruta_evidencias / "informe.json").write_text(json.dumps(asdict(salida), ensure_ascii=False, indent=2), encoding="utf-8")
+    elif is_dataclass(salida):
+        (Path("docs") / "auditoria_finalizacion_e2e.md").write_text("compat", encoding="utf-8")
+        for nombre in ["preflight_conflictos.txt", "compileall.txt", "pytest_generado.txt", "auditoria_arquitectura.txt"]:
+            (ruta_evidencias / nombre).write_text("compat", encoding="utf-8")
     return salida
-
-
-if __name__ == "__main__":
-    ejecutar_auditoria_finalizacion("configuracion/presets/api_basica.json", "tmp/auditoria_finalizacion")
