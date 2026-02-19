@@ -14,6 +14,8 @@ from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvp
 from aplicacion.casos_uso.generar_manifest import GenerarManifest
 from aplicacion.casos_uso.presets import CargarPresetProyecto
+from aplicacion.casos_uso.validar_compatibilidad_blueprints import ValidarCompatibilidadBlueprints
+from infraestructura.blueprints.metadata_registry import obtener_metadata_blueprints
 from infraestructura.manifest.generador_manifest import GeneradorManifest
 from infraestructura.planificador_blueprints_real import PlanificadorBlueprintsReal
 
@@ -52,6 +54,7 @@ def construir_contenedor_cli() -> ContenedorCli:
 
     auditor_proyecto = AuditarProyectoGenerado(puertos.ejecutor_procesos)
     auditor_arquitectura = AuditarProyectoGeneradoArquitectura()
+    metadata_blueprints = obtener_metadata_blueprints()
 
     return ContenedorCli(
         crear_plan_desde_blueprints=crear_plan_desde_blueprints,
@@ -83,5 +86,6 @@ def construir_contenedor_cli() -> ContenedorCli:
             ),
             auditor_arquitectura=auditor_arquitectura,
             ejecutor_procesos=puertos.ejecutor_procesos,
+            validador_compatibilidad_blueprints=ValidarCompatibilidadBlueprints(metadata_blueprints),
         ),
     )

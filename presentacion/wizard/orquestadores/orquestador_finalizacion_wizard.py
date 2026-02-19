@@ -7,6 +7,7 @@ import logging
 from typing import Any, Callable
 
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvpEntrada
+from aplicacion.casos_uso.validar_compatibilidad_blueprints import ValidarCompatibilidadBlueprints
 from aplicacion.errores import (
     ErrorAplicacion,
     ErrorAuditoria,
@@ -78,16 +79,26 @@ class OrquestadorFinalizacionWizard:
         lanzador_generacion: Callable[[GenerarProyectoMvpEntrada], None],
         servicio_credenciales: Any | None = None,
         servicio_presets: Any | None = None,
+        validador_compatibilidad_blueprints: ValidarCompatibilidadBlueprints | None = None,
     ) -> None:
         self._validador_final = validador_final
         self._lanzador_generacion = lanzador_generacion
         self._servicio_credenciales = servicio_credenciales or ServicioCredencialesWizardNulo()
         self._servicio_presets = servicio_presets
+        self._validador_compatibilidad = validador_compatibilidad_blueprints or ValidarCompatibilidadBlueprints()
 
     def finalizar(self, dto: DtoEntradaFinalizacionWizard) -> DtoResultadoFinalizacionWizard:
         detalles = self._crear_detalles_base()
         try:
             self._validar_entrada(dto)
+            resultado_compatibilidad = self._validar_compatibilidad_blueprints(dto)
+            if not resultado_compatibilidad.es_valido:
+                detalles["conflictos_declarativos"] = resultado_compatibilidad.conflictos
+                return DtoResultadoFinalizacionWizard(
+                    exito=False,
+                    mensaje_usuario="Se detectaron incompatibilidades declarativas entre blueprints.",
+                    detalles=detalles,
+                )
             self._persistir_credenciales(dto, detalles)
             entrada_generacion = self._preparar_dto_generacion(dto)
             self._ejecutar_generacion(entrada_generacion)
@@ -133,6 +144,10 @@ class OrquestadorFinalizacionWizard:
             nombre_proyecto=dto.datos_wizard.nombre,
             blueprints=dto.blueprints,
         )
+
+    def _validar_compatibilidad_blueprints(self, dto: DtoEntradaFinalizacionWizard):
+        hay_clases = bool(dto.datos_wizard.proyecto and dto.datos_wizard.proyecto.clases)
+        return self._validador_compatibilidad.ejecutar(dto.blueprints, hay_clases=hay_clases)
 
     def _persistir_credenciales(
         self,

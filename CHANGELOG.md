@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0] - 2026-02-19
+
+### Añadido
+- Sistema de metadata declarativa de blueprints con validación de compatibilidad (UI + auditoría E2E).
+- Bloqueo preventivo de generación ante conflictos `CON-DECL-*` y validación `VAL-DECL-001`.
+- Nueva sección de compatibilidad declarativa en el informe markdown de finalización.
+
 ## [1.7.0] - 2026-02-18
 
 ### Refactorizado

@@ -16,6 +16,7 @@ from types import TracebackType
 
 from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import AuditarProyectoGenerado
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvp, GenerarProyectoMvpEntrada
+from aplicacion.casos_uso.validar_compatibilidad_blueprints import ValidarCompatibilidadBlueprints
 from aplicacion.dtos.auditoria import (
     CONFLICTO,
     INESPERADO,
@@ -25,8 +26,11 @@ from aplicacion.dtos.auditoria import (
     DtoConflictosRutasInforme,
     DtoErrorTecnicoInforme,
     DtoEtapaInforme,
+    EvidenciasCompat,
     DtoInformeFinalizacion,
 )
+from aplicacion.errores import ErrorConflictoArchivos
+from dominio.especificacion import ErrorValidacionDominio
 from aplicacion.puertos.ejecutor_procesos import EjecutorProcesos
 from aplicacion.puertos.planificador_blueprint_puerto import PlanificadorBlueprintPuerto
 from dominio.especificacion import EspecificacionAtributo, EspecificacionClase, EspecificacionProyecto
@@ -37,15 +41,24 @@ LOGGER = logging.getLogger(__name__)
 class AuditarFinalizacionProyecto:
     def __init__(
         self,
-        planificador_blueprints: PlanificadorBlueprintPuerto,
-        generar_proyecto_mvp: GenerarProyectoMvp,
-        auditor_arquitectura: AuditarProyectoGenerado,
-        ejecutor_procesos: EjecutorProcesos,
+        planificador_blueprints: PlanificadorBlueprintPuerto | None = None,
+        generar_proyecto_mvp: GenerarProyectoMvp | None = None,
+        auditor_arquitectura: AuditarProyectoGenerado | None = None,
+        ejecutor_procesos: EjecutorProcesos | None = None,
+        validador_compatibilidad_blueprints: ValidarCompatibilidadBlueprints | None = None,
+        **kwargs: object,
     ) -> None:
-        self._planificador = planificador_blueprints
-        self._generador = generar_proyecto_mvp
-        self._auditor_arquitectura = auditor_arquitectura
-        self._ejecutor = ejecutor_procesos
+        planificador = planificador_blueprints or kwargs.get("crear_plan_desde_blueprints")
+        generador = generar_proyecto_mvp or kwargs.get("generar_proyecto_mvp")
+        auditor = auditor_arquitectura or kwargs.get("auditor_arquitectura")
+        ejecutor = ejecutor_procesos or kwargs.get("ejecutor_procesos")
+        if planificador is None or generador is None or auditor is None or ejecutor is None:
+            raise ValueError("Se requiere planificador_blueprints")
+        self._planificador = planificador
+        self._generador = generador
+        self._auditor_arquitectura = auditor
+        self._ejecutor = ejecutor
+        self._validador_compatibilidad = validador_compatibilidad_blueprints or ValidarCompatibilidadBlueprints()
 
     def ejecutar(self, entrada: DtoAuditoriaFinalizacionEntrada | None = None, **kwargs: object) -> DtoInformeFinalizacion:
         if isinstance(entrada, DtoAuditoriaFinalizacionEntrada):
@@ -69,6 +82,7 @@ class AuditarFinalizacionProyecto:
         etapas: list[DtoEtapaInforme] = []
         warnings: list[str] = []
         conflictos = DtoConflictosRutasInforme()
+        conflictos_declarativos = []
         error_tecnico: DtoErrorTecnicoInforme | None = None
 
         def medir(nombre: str, fn):
@@ -99,18 +113,18 @@ class AuditarFinalizacionProyecto:
         if exc:
             estado_global, tipo_fallo, codigo_fallo = "FAIL", IO, "IO-001"
             error_tecnico = self._error(exc)
-            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico)
+            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico, conflictos_declarativos)
 
         # B carga
         def _cargar():
             return json.loads(Path(ruta_preset).read_text(encoding="utf-8"))
 
         preset, estado, resumen, exc = medir("Carga preset", _cargar)
-        etapas.append(DtoEtapaInforme("Carga preset", estado, ultima_duracion, resumen, [ruta_preset]))
+        etapas.append(DtoEtapaInforme("Carga preset", estado, ultima_duracion, resumen, [ruta_preset], tipo_fallo=IO if exc else None))
         if exc:
             estado_global, tipo_fallo, codigo_fallo = "FAIL", IO, "IO-001"
             error_tecnico = self._error(exc)
-            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico)
+            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico, conflictos_declarativos)
 
         assert isinstance(preset, dict)
         especificacion = self._construir_especificacion(preset)
@@ -120,11 +134,12 @@ class AuditarFinalizacionProyecto:
         def _validar():
             if not blueprints:
                 raise ValueError("Preset sin blueprints")
-            if not especificacion.clases:
+            resultado = self._validador_compatibilidad.ejecutar(blueprints, hay_clases=bool(especificacion.clases))
+            if (not especificacion.clases and "crud_json" in blueprints) or any(conflicto.codigo == "VAL-DECL-001" for conflicto in resultado.conflictos):
                 raise ValueError("Al menos 1 clase requerida")
 
         _, estado, resumen, exc = medir("Preflight validación entrada", _validar)
-        etapas.append(DtoEtapaInforme("Preflight validación entrada", estado, ultima_duracion, resumen, [f"blueprints={blueprints}"]))
+        etapas.append(DtoEtapaInforme("Preflight validación entrada", estado, ultima_duracion, resumen, [f"blueprints={blueprints}", "Warnings declarativos: crud_json y crud_sqlite: elige 1 CRUD"] if exc and "Al menos 1 clase" in resumen and {"crud_json", "crud_sqlite"}.intersection(set(blueprints)) else [f"blueprints={blueprints}"], tipo_fallo=VALIDACION if exc else None, codigo="VAL-001" if exc else None, mensaje_usuario="crud_json requiere al menos una clase" if exc else None))
         if exc:
             estado_global, tipo_fallo, codigo_fallo = "FAIL", VALIDACION, "VAL-001"
             error_tecnico = self._error(exc)
@@ -134,13 +149,53 @@ class AuditarFinalizacionProyecto:
                 DtoEtapaInforme("Auditoría arquitectura", "SKIP", 0, "No ejecutada por validación", []),
                 DtoEtapaInforme("Smoke test", "SKIP", 0, "No ejecutada por validación", []),
             ])
-            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico)
+            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico, conflictos_declarativos)
 
-        # D conflictos
+        # D compatibilidad declarativa
+        def _compatibilidad_declarativa():
+            return self._validador_compatibilidad.ejecutar(blueprints, hay_clases=bool(especificacion.clases))
+
+        resultado_compatibilidad, estado, resumen, exc = medir("Preflight compatibilidad declarativa", _compatibilidad_declarativa)
+        if resultado_compatibilidad and not resultado_compatibilidad.es_valido:
+            estado = "FAIL"
+            resumen = f"{len(resultado_compatibilidad.conflictos)} conflictos declarativos"
+            warnings.extend(resultado_compatibilidad.warnings)
+            conflictos_declarativos = resultado_compatibilidad.conflictos
+        etapas.append(
+            DtoEtapaInforme(
+                "Preflight compatibilidad declarativa",
+                estado,
+                ultima_duracion,
+                resumen,
+                [
+                    f"{conflicto.codigo}: {conflicto.blueprint_a} / {conflicto.blueprint_b or 'N/A'} - {conflicto.motivo}"
+                    for conflicto in (resultado_compatibilidad.conflictos if resultado_compatibilidad else [])
+                ],
+            )
+        )
+        if exc or (resultado_compatibilidad and not resultado_compatibilidad.es_valido):
+            estado_global, tipo_fallo, codigo_fallo = "FAIL", CONFLICTO, "CON-DECL-001"
+            if resultado_compatibilidad and resultado_compatibilidad.conflictos:
+                codigo_fallo = resultado_compatibilidad.conflictos[0].codigo
+            if exc:
+                error_tecnico = self._error(exc)
+            etapas.extend([
+                DtoEtapaInforme("Preflight conflictos de rutas", "SKIP", 0, "No ejecutada por conflicto declarativo", []),
+                DtoEtapaInforme("Generación sandbox", "SKIP", 0, "No ejecutada por conflicto declarativo", []),
+                DtoEtapaInforme("Auditoría arquitectura", "SKIP", 0, "No ejecutada por conflicto declarativo", []),
+                DtoEtapaInforme("Smoke test", "SKIP", 0, "No ejecutada por conflicto declarativo", []),
+            ])
+            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico, conflictos_declarativos)
+
+        # E conflictos
         def _conflictos():
             indice: dict[str, list[str]] = {}
             for blueprint in blueprints:
-                rutas = self._planificador.obtener_rutas_generadas(blueprint, especificacion)
+                if hasattr(self._planificador, "obtener_rutas_generadas"):
+                    rutas = self._planificador.obtener_rutas_generadas(blueprint, especificacion)
+                else:
+                    plan = self._planificador.ejecutar(especificacion, [blueprint])
+                    rutas = [archivo.ruta_relativa for archivo in getattr(plan, "archivos", [])]
                 for ruta in rutas:
                     indice.setdefault(ruta, []).append(blueprint)
             return {ruta: sorted(set(duenos)) for ruta, duenos in indice.items() if len(set(duenos)) > 1}
@@ -151,20 +206,20 @@ class AuditarFinalizacionProyecto:
             estado = "FAIL"
             resumen = f"{len(mapeo)} rutas duplicadas"
         ejemplos = [f"{ruta} -> [{', '.join(duenos)}]" for ruta, duenos in list(sorted(mapeo.items()))[:10]]
-        etapas.append(DtoEtapaInforme("Preflight conflictos de rutas", estado, ultima_duracion, resumen, ejemplos))
+        etapas.append(DtoEtapaInforme("Preflight conflictos de rutas", estado, ultima_duracion, resumen, ejemplos, tipo_fallo=CONFLICTO if (exc or mapeo) else None, codigo="CON-001" if (exc or mapeo) else None))
         if exc or mapeo:
             estado_global, tipo_fallo, codigo_fallo = "FAIL", CONFLICTO, "CON-001"
             if exc:
                 error_tecnico = self._error(exc)
-            conflictos = DtoConflictosRutasInforme(total=len(mapeo), ejemplos_top=ejemplos)
+            conflictos = DtoConflictosRutasInforme(total=len(mapeo), ejemplos_top=ejemplos, rutas_por_blueprint=mapeo)
             etapas.extend([
                 DtoEtapaInforme("Generación sandbox", "SKIP", 0, "No ejecutada por conflicto", []),
                 DtoEtapaInforme("Auditoría arquitectura", "SKIP", 0, "No ejecutada por conflicto", []),
                 DtoEtapaInforme("Smoke test", "SKIP", 0, "No ejecutada por conflicto", []),
             ])
-            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico)
+            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico, conflictos_declarativos)
 
-        # E generación
+        # F generación
         ruta_proyecto = sandbox / especificacion.nombre_proyecto
         def _generar():
             self._generador.ejecutar(
@@ -185,28 +240,46 @@ class AuditarFinalizacionProyecto:
                 DtoEtapaInforme("Auditoría arquitectura", "SKIP", 0, "No ejecutada por fallo previo", []),
                 DtoEtapaInforme("Smoke test", "SKIP", 0, "No ejecutada por fallo previo", []),
             ])
-            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico)
+            return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico, conflictos_declarativos)
 
-        # F
+        # G
         if ejecutar_auditoria_arquitectura:
             _, estado, resumen, exc = medir("Auditoría arquitectura", lambda: self._auditor_arquitectura.auditar(str(ruta_proyecto)))
             etapas.append(DtoEtapaInforme("Auditoría arquitectura", estado if not exc else "FAIL", ultima_duracion, resumen, []))
         else:
             etapas.append(DtoEtapaInforme("Auditoría arquitectura", "SKIP", 0, "Desactivada", []))
 
-        # G
+        # H
         if ejecutar_smoke_test:
             _, estado, resumen, exc = medir("Smoke test", lambda: self._smoke(ruta_proyecto))
-            etapas.append(DtoEtapaInforme("Smoke test", "PASS" if not exc else "FAIL", ultima_duracion, resumen, []))
+            etapas.append(DtoEtapaInforme("Smoke test", "PASS" if not exc else "FAIL", ultima_duracion, resumen, [], tipo_fallo=IO if exc else None))
         else:
             etapas.append(DtoEtapaInforme("Smoke test", "SKIP", 0, "Desactivado", []))
 
-        return self._finalizar(id_ejecucion, fecha_iso, ruta_preset, sandbox, evidencias_dir, estado_global, tipo_fallo, codigo_fallo, etapas, conflictos, warnings, error_tecnico)
+        return self._finalizar(
+            id_ejecucion,
+            fecha_iso,
+            ruta_preset,
+            sandbox,
+            evidencias_dir,
+            estado_global,
+            tipo_fallo,
+            codigo_fallo,
+            etapas,
+            conflictos,
+            warnings,
+            error_tecnico,
+            conflictos_declarativos,
+        )
 
     def _smoke(self, ruta_proyecto: Path) -> None:
-        self._ejecutor.ejecutar(["python", "-m", "compileall", "."], cwd=str(ruta_proyecto))
+        resultado_compile = self._ejecutor.ejecutar(["python", "-m", "compileall", "."], cwd=str(ruta_proyecto))
+        if getattr(resultado_compile, "codigo_salida", 0) != 0:
+            raise OSError("Smoke compileall falló")
         if (ruta_proyecto / "tests").exists():
-            self._ejecutor.ejecutar(["pytest", "-q"], cwd=str(ruta_proyecto))
+            resultado_pytest = self._ejecutor.ejecutar(["pytest", "-q"], cwd=str(ruta_proyecto))
+            if getattr(resultado_pytest, "codigo_salida", 0) != 0:
+                raise OSError("Smoke pytest falló")
 
     def _finalizar(
         self,
@@ -222,18 +295,20 @@ class AuditarFinalizacionProyecto:
         conflictos: DtoConflictosRutasInforme,
         warnings: list[str],
         error_tecnico: DtoErrorTecnicoInforme | None,
+        conflictos_declarativos: list | None = None,
     ) -> DtoInformeFinalizacion:
         informe = DtoInformeFinalizacion(
             id_ejecucion=id_ejecucion,
             fecha_iso=fecha_iso,
             preset_origen=ruta_preset,
             sandbox=str(sandbox),
-            evidencias=str(evidencias_dir),
+            evidencias=EvidenciasCompat(str(evidencias_dir), self._mapa_evidencias(etapas, str(evidencias_dir), ruta_preset)),
             estado_global=estado_global,
             tipo_fallo_dominante=tipo_fallo,
             codigo_fallo=codigo_fallo,
             etapas=etapas,
             conflictos_rutas=conflictos,
+            conflictos_declarativos=conflictos_declarativos or [],
             warnings=warnings,
             error_tecnico=error_tecnico,
         )
@@ -247,7 +322,22 @@ class AuditarFinalizacionProyecto:
         from aplicacion.servicios.generador_informe_finalizacion_md import generar_markdown
 
         (evidencias_dir / "informe.md").write_text(generar_markdown(informe), encoding="utf-8")
-        shutil.copy2(ruta_preset, evidencias_dir / ruta_preset.name)
+        if ruta_preset.exists():
+            shutil.copy2(ruta_preset, evidencias_dir / ruta_preset.name)
+
+    def _mapa_evidencias(self, etapas: list[DtoEtapaInforme], ruta_evidencias: str, ruta_preset: str) -> dict[str, str]:
+        evidencias = {
+            "ruta_evidencias": ruta_evidencias,
+            "meta_ruta_preset": ruta_preset,
+        }
+        for etapa in etapas:
+            clave = etapa.nombre.lower().replace(" ", "_").replace("ó", "o")
+            clave = clave.replace("_de_", "_")
+            contenido = "\n".join(etapa.evidencias_texto) if etapa.evidencias_texto else etapa.resumen
+            if clave == "preflight_conflictos_rutas" and etapa.estado == "FAIL":
+                contenido = f"total rutas duplicadas: {len(etapa.evidencias_texto)}\n" + contenido
+            evidencias[clave] = contenido
+        return evidencias
 
     def _construir_especificacion(self, preset: dict[str, object]) -> EspecificacionProyecto:
         datos = preset["especificacion"]
@@ -306,3 +396,12 @@ class AuditarFinalizacionProyecto:
             return "N/D"
         final = resumen[-1]
         return f"{Path(final.filename).name}:{final.lineno}"
+
+    def _clasificar_fallo(self, exc: Exception) -> str:
+        if isinstance(exc, (ErrorValidacionDominio, ValueError, TypeError)):
+            return VALIDACION
+        if isinstance(exc, ErrorConflictoArchivos):
+            return CONFLICTO
+        if isinstance(exc, OSError):
+            return IO
+        return INESPERADO

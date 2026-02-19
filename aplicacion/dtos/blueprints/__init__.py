@@ -1,13 +1,15 @@
-"""DTOs de la capa de aplicación."""
+"""DTOs del subdominio de blueprints."""
 
-from aplicacion.dtos.blueprints import (
+from .dto_blueprint_metadata import (
     DtoBlueprintMetadata,
     DtoConflictoBlueprint,
     DtoResultadoValidacionCompatibilidad,
+    TipoBlueprint,
 )
 
 __all__ = [
     "DtoBlueprintMetadata",
     "DtoConflictoBlueprint",
     "DtoResultadoValidacionCompatibilidad",
+    "TipoBlueprint",
 ]

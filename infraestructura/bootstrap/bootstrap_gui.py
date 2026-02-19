@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import AuditarProyectoGenerado
 from aplicacion.casos_uso.consultar_catalogo_blueprints import ConsultarCatalogoBlueprints
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvp
+from aplicacion.dtos.blueprints import DtoBlueprintMetadata
+from infraestructura.blueprints.metadata_registry import obtener_metadata_blueprints
 from infraestructura.manifest.generador_manifest import GeneradorManifest
 
 from .bootstrap_base import (
@@ -25,6 +27,7 @@ class ContenedorGui:
     cargar_preset_proyecto: object
     guardar_credencial: object
     consultar_catalogo_blueprints: ConsultarCatalogoBlueprints
+    metadata_blueprints: dict[str, DtoBlueprintMetadata]
 
 
 def construir_contenedor_gui() -> ContenedorGui:
@@ -49,4 +52,5 @@ def construir_contenedor_gui() -> ContenedorGui:
             repositorio_blueprints=repositorios.repositorio_blueprints,
             descubridor_plugins=puertos.descubridor_plugins,
         ),
+        metadata_blueprints=obtener_metadata_blueprints(),
     )

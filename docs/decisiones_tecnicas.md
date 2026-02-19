@@ -127,3 +127,16 @@ en lugar de heurísticas por coincidencia textual de palabras en la línea. Con 
 falsos positivos cuando un nombre de archivo contiene términos como `infraestructura` sin
 implicar una dependencia a esa capa. Además, el paquete de reglas de dependencias conserva
 su API pública con imports diferidos en `__init__.py` para minimizar acoplamiento en carga.
+
+## Compatibilidad declarativa de blueprints
+
+**Decisión:** mover reglas de compatibilidad a metadata explícita por blueprint.
+
+**Motivación:**
+- evitar conflictos tardíos de rutas cuando ya se inició la generación;
+- dar feedback temprano en UI con reglas legibles;
+- reutilizar la misma validación en wizard y auditoría E2E.
+
+**Consecuencia:**
+- se agrega un registro de metadata y un caso de uso dedicado;
+- la validación de compatibilidad queda desacoplada de rutas físicas.

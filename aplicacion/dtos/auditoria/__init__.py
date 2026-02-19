@@ -12,6 +12,7 @@ from .dto_informe_finalizacion import (
     DtoErrorTecnicoInforme,
     DtoEtapaInforme,
     DtoInformeFinalizacion,
+    EvidenciasCompat,
 )
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "DtoEtapaInforme",
     "DtoConflictosRutasInforme",
     "DtoErrorTecnicoInforme",
+    "EvidenciasCompat",
 ]

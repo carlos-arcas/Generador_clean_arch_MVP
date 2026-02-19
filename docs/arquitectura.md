@@ -123,3 +123,13 @@ Los artefactos de UI se ubican en `presentacion/dtos/` y `presentacion/mapeadore
 `DtoVistaClase` y `DtoVistaAtributo` modelan datos listos para widget/CLI sin arrastrar detalles de casos de uso.
 El mapeador `mapeador_dominio_a_vista.py` adapta entidades de dominio a DTOs de vista y viceversa para edición en UI.
 Con esto, `aplicacion/` queda libre de módulos `*_presentacion*` y se respeta la dirección de dependencias por capa.
+
+## Metadata declarativa de blueprints
+
+Se incorporó un registro declarativo de blueprints para modelar compatibilidades antes de la generación.
+
+- DTO central: `DtoBlueprintMetadata` con tipo, entidad, capas generadas y reglas de compatibilidad.
+- Registro en infraestructura: `infraestructura/blueprints/metadata_registry.py`.
+- Caso de uso de validación: `ValidarCompatibilidadBlueprints`.
+- La UI aplica validación preventiva y deshabilita selecciones incompatibles.
+- Auditoría E2E incorpora etapa `Preflight compatibilidad declarativa` previa al análisis de rutas.
