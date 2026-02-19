@@ -1,3 +1,6 @@
+import ast
+import inspect
+import textwrap
 from pathlib import Path
 
 from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
@@ -42,6 +45,28 @@ def test_validador_imports_caso_correcto(tmp_path: Path) -> None:
 
 def test_validador_imports_detecta_presentacion_hacia_dominio(tmp_path: Path) -> None:
     _crear_estructura_minima(tmp_path)
+    (tmp_path / "presentacion" / "vista.py").write_text("from dominio.entidad import Entidad\n", encoding="utf-8")
+    (tmp_path / "dominio" / "entidad.py").write_text("class Entidad: pass\n", encoding="utf-8")
+
+    resultado = ValidadorImports().validar(ContextoAuditoria(base=tmp_path))
+
+    assert resultado.exito is False
+    assert any("Import prohibido en presentación" in error for error in resultado.errores)
+
+
+def test_validador_imports_detecta_aplicacion_hacia_infraestructura(tmp_path: Path) -> None:
+    _crear_estructura_minima(tmp_path)
+    (tmp_path / "aplicacion" / "caso.py").write_text("from infraestructura.repo import Repo\n", encoding="utf-8")
+    (tmp_path / "infraestructura" / "repo.py").write_text("class Repo: pass\n", encoding="utf-8")
+
+    resultado = ValidadorImports().validar(ContextoAuditoria(base=tmp_path))
+
+    assert resultado.exito is False
+    assert any("Import prohibido en aplicación" in error for error in resultado.errores)
+
+
+def test_validador_imports_detecta_dominio_hacia_otras_capas(tmp_path: Path) -> None:
+    _crear_estructura_minima(tmp_path)
     (tmp_path / "dominio" / "entidad.py").write_text("from presentacion.ui import Pantalla\n", encoding="utf-8")
 
     resultado = ValidadorImports().validar(ContextoAuditoria(base=tmp_path))
@@ -50,21 +75,19 @@ def test_validador_imports_detecta_presentacion_hacia_dominio(tmp_path: Path) ->
     assert any("Import prohibido en dominio" in error for error in resultado.errores)
 
 
-def test_validador_imports_detecta_aplicacion_hacia_infraestructura(tmp_path: Path) -> None:
-    _crear_estructura_minima(tmp_path)
-    (tmp_path / "aplicacion" / "caso.py").write_text("import sqlite3\n", encoding="utf-8")
-
-    resultado = ValidadorImports().validar(ContextoAuditoria(base=tmp_path))
-
-    assert resultado.exito is False
-    assert any("sqlite3 fuera de infraestructura" in error for error in resultado.errores)
-
-
 def test_validador_imports_proyecto_vacio(tmp_path: Path) -> None:
     resultado = ValidadorImports().validar(ContextoAuditoria(base=tmp_path))
 
     assert resultado.exito is True
     assert resultado.errores == []
+
+
+def test_regla_imports_dominio_reducida_en_complejidad() -> None:
+    codigo = textwrap.dedent(inspect.getsource(ValidadorImports._regla_imports_dominio))
+    arbol = ast.parse(codigo)
+    nodos_if = [nodo for nodo in ast.walk(arbol) if isinstance(nodo, ast.If)]
+
+    assert len(nodos_if) <= 2
 
 
 def test_auditar_proyecto_incluye_validador_imports_en_pipeline(tmp_path: Path) -> None:
