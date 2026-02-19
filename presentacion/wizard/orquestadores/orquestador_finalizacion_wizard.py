@@ -27,6 +27,18 @@ class _ErrorInfraestructuraGeneracionWizard(Exception):
     """Error técnico al iniciar generación desde el wizard."""
 
 
+MAPEO_ERRORES_A_MENSAJES: dict[type[Exception], str] = {
+    ErrorValidacionEntrada: "Error de validación: {error}",
+    ValueError: "Error de validación: {error}",
+    TypeError: "Error de validación: {error}",
+    ErrorGeneracionProyecto: "Error al iniciar generación: {error}",
+    ErrorAuditoria: "Error al iniciar generación: {error}",
+    ErrorAplicacion: "Error al iniciar generación: {error}",
+    _ErrorInfraestructuraValidacionWizard: "Error técnico durante la validación final.",
+    _ErrorInfraestructuraGeneracionWizard: "Error técnico al iniciar generación.",
+}
+
+
 @dataclass(frozen=True)
 class DtoEntradaFinalizacionWizard:
     """Entrada para finalizar el wizard sin dependencias de Qt."""
@@ -186,17 +198,7 @@ class OrquestadorFinalizacionWizard:
         )
 
     def _mapear_mensaje_error(self, error: Exception) -> str:
-        if isinstance(error, (ErrorValidacionEntrada, ValueError, TypeError)):
-            return f"Error de validación: {error}"
-        if isinstance(error, (ErrorGeneracionProyecto, ErrorAuditoria)):
-            return f"Error al iniciar generación: {error}"
-        if isinstance(error, _ErrorInfraestructuraValidacionWizard):
-            LOGGER.error("Error técnico durante validación final del wizard.", exc_info=True)
-            return "Error técnico durante la validación final."
-        if isinstance(error, _ErrorInfraestructuraGeneracionWizard):
-            LOGGER.error("Error técnico al iniciar la generación del proyecto.", exc_info=True)
-            return "Error técnico al iniciar generación."
-        if isinstance(error, ErrorAplicacion):
-            return f"Error al iniciar generación: {error}"
-        LOGGER.error("Error técnico no esperado durante la finalización del wizard.", exc_info=True)
+        for tipo_error, plantilla_mensaje in MAPEO_ERRORES_A_MENSAJES.items():
+            if isinstance(error, tipo_error):
+                return plantilla_mensaje.format(error=error)
         return "Error técnico al iniciar generación."
