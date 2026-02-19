@@ -10,15 +10,15 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 QtCore = pytest.importorskip("PySide6.QtCore", exc_type=ImportError)
 Qt = QtCore.Qt
 
-from dominio.modelos import EspecificacionAtributo, EspecificacionClase
+from presentacion.dtos import DtoAtributoPresentacion, DtoClasePresentacion
 from presentacion.modelos_qt.modelo_atributos import ModeloAtributos
 from presentacion.modelos_qt.modelo_clases import ModeloClases
 
 
 def test_modelo_clases_expone_datos_y_encabezados() -> None:
-    clase = EspecificacionClase(
+    clase = DtoClasePresentacion(
         nombre="Cliente",
-        atributos=[EspecificacionAtributo(nombre="nombre", tipo="str", obligatorio=True)],
+        atributos=[DtoAtributoPresentacion(nombre="nombre", tipo="str", obligatorio=True)],
     )
     modelo = ModeloClases([clase])
 
@@ -32,7 +32,7 @@ def test_modelo_clases_expone_datos_y_encabezados() -> None:
 
 
 def test_modelo_atributos_expone_datos_y_actualiza() -> None:
-    atributo = EspecificacionAtributo(
+    atributo = DtoAtributoPresentacion(
         nombre="edad",
         tipo="int",
         obligatorio=False,

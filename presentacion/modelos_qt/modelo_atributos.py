@@ -4,19 +4,19 @@ from __future__ import annotations
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
-from dominio.especificacion import EspecificacionAtributo
+from presentacion.dtos import DtoAtributoPresentacion
 
 
 class ModeloAtributos(QAbstractTableModel):
-    """Expone una lista de ``EspecificacionAtributo`` en una tabla Qt."""
+    """Expone una lista de ``DtoAtributoPresentacion`` en una tabla Qt."""
 
     ENCABEZADOS = ["Nombre", "Tipo", "Obligatorio", "Valor por defecto"]
 
-    def __init__(self, atributos: list[EspecificacionAtributo] | None = None) -> None:
+    def __init__(self, atributos: list[DtoAtributoPresentacion] | None = None) -> None:
         super().__init__()
         self._atributos = atributos or []
 
-    def actualizar(self, atributos: list[EspecificacionAtributo]) -> None:
+    def actualizar(self, atributos: list[DtoAtributoPresentacion]) -> None:
         self.beginResetModel()
         self._atributos = atributos
         self.endResetModel()
@@ -58,7 +58,7 @@ class ModeloAtributos(QAbstractTableModel):
             return self.ENCABEZADOS[section]
         return str(section + 1)
 
-    def atributo_en_fila(self, fila: int) -> EspecificacionAtributo | None:
+    def atributo_en_fila(self, fila: int) -> DtoAtributoPresentacion | None:
         if fila < 0 or fila >= len(self._atributos):
             return None
         return self._atributos[fila]
