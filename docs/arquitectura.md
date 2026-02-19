@@ -6,6 +6,44 @@
 - **Infraestructura**: repositorios de blueprints, manifest, sistema de archivos, hashes, presets en disco.
 - **Presentación**: UI PySide6 y CLI por `argparse`.
 
+## Diagrama ASCII
++---------------------+
+|    Presentación     |
+|  (UI/CLI/Workers)   |
++----------+----------+
+           |
+           v
++---------------------+
+|     Aplicación      |
+|  (Casos de uso)     |
+|  Puertos/DTOs       |
++----------+----------+
+           |
+           v
++---------------------+
+|   Infraestructura   |
+| (Adaptadores/IO)    |
++----------+----------+
+           ^
+           |
++---------------------+
+|       Dominio       |
+| (Entidades/Reglas)  |
++---------------------+
+
+## Reglas de dependencias
+- dominio no importa de nadie.
+- aplicacion importa dominio (y define puertos).
+- infraestructura implementa puertos (importa aplicacion/dominio).
+- presentacion orquesta (importa aplicacion; infraestructura solo en composition root).
+
+## Flujo de ejecución
+1. UI recopila inputs y construye DTO de entrada.
+2. Orquestador invoca un caso de uso de aplicación.
+3. El caso de uso consume puertos y delega en adaptadores de infraestructura.
+4. El resultado regresa a UI y se mapea a vista/CLI.
+5. Logging y manejo de errores incorporan ID de incidente para soporte.
+
 ## Presentación (wizard por páginas)
 La UI de escritorio está organizada como un `QWizard` real con 4 pasos desacoplados:
 1. **Datos del proyecto**: nombre, ruta destino, descripción y versión.
