@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from aplicacion.casos_uso.actualizar_manifest_patch import ActualizarManifestPatch
+from aplicacion.casos_uso.auditar_finalizacion_proyecto import AuditarFinalizacionProyecto
 from aplicacion.casos_uso.auditar_proyecto_generado import AuditarProyectoGenerado
+from aplicacion.casos_uso.auditoria.auditar_proyecto_generado import AuditarProyectoGenerado as AuditarProyectoGeneradoArquitectura
 from aplicacion.casos_uso.crear_plan_desde_blueprints import CrearPlanDesdeBlueprints
 from aplicacion.casos_uso.crear_plan_patch_desde_blueprints import CrearPlanPatchDesdeBlueprints
 from aplicacion.casos_uso.ejecutar_plan import EjecutarPlan
@@ -28,6 +30,7 @@ class ContenedorCli:
     cargar_preset_proyecto: CargarPresetProyecto
     generar_proyecto_mvp: GenerarProyectoMvp
     auditar_proyecto: AuditarProyectoGenerado
+    auditar_finalizacion_proyecto: AuditarFinalizacionProyecto
 
 
 def construir_contenedor_cli() -> ContenedorCli:
@@ -45,6 +48,9 @@ def construir_contenedor_cli() -> ContenedorCli:
         sistema_archivos=puertos.sistema_archivos,
         generador_manifest=generar_manifest,
     )
+
+    auditor_proyecto = AuditarProyectoGenerado(puertos.ejecutor_procesos)
+    auditor_arquitectura = AuditarProyectoGeneradoArquitectura()
 
     return ContenedorCli(
         crear_plan_desde_blueprints=crear_plan_desde_blueprints,
@@ -65,5 +71,17 @@ def construir_contenedor_cli() -> ContenedorCli:
             sistema_archivos=puertos.sistema_archivos,
             generador_manifest=GeneradorManifest(),
         ),
-        auditar_proyecto=AuditarProyectoGenerado(puertos.ejecutor_procesos),
+        auditar_proyecto=auditor_proyecto,
+        auditar_finalizacion_proyecto=AuditarFinalizacionProyecto(
+            crear_plan_desde_blueprints=crear_plan_desde_blueprints,
+            generar_proyecto_mvp=GenerarProyectoMvp(
+                crear_plan_desde_blueprints=crear_plan_desde_blueprints,
+                ejecutar_plan=ejecutar_plan,
+                sistema_archivos=puertos.sistema_archivos,
+                generador_manifest=GeneradorManifest(),
+            ),
+            auditor_arquitectura=auditor_arquitectura,
+            ejecutor_procesos=puertos.ejecutor_procesos,
+            sistema_archivos=puertos.sistema_archivos,
+        ),
     )
