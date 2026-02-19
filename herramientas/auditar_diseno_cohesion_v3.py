@@ -12,11 +12,7 @@ LOGGER = logging.getLogger(__name__)
 
 DIRECTORIOS_EXCLUIDOS = {".git", ".venv", "__pycache__", ".pytest_cache", "tests", "herramientas"}
 
-JUSTIFICACIONES = {
-    ("Import prohibido presentacion->dominio", "presentacion/mappers/mapper_dominio_a_presentacion.py", 5): (
-        "Deuda técnica aceptada: mapper anti-corrupción mientras se termina la migración a DTOs de presentación."
-    ),
-}
+JUSTIFICACIONES: dict[tuple[str, str, int], str] = {}
 PATRON_PRIVADOS_ENCADENADOS = re.compile(r"\._[a-zA-Z0-9]+\._[a-zA-Z0-9]+")
 
 

@@ -1,13 +1,13 @@
-"""Mapeos entre entidades de dominio y DTOs de presentación."""
+"""Adaptador anti-corrupción para mapear dominio hacia DTOs de presentación."""
 
 from __future__ import annotations
 
+from aplicacion.dtos_presentacion import DtoAtributoPresentacion, DtoClasePresentacion
 from dominio.especificacion import EspecificacionAtributo, EspecificacionClase
-from presentacion.dtos import DtoAtributoPresentacion, DtoClasePresentacion
 
 
 def mapear_clase_dominio_a_dto(clase_dominio: EspecificacionClase) -> DtoClasePresentacion:
-    """Convierte una entidad de dominio de clase en DTO de presentación."""
+    """Convierte una entidad de dominio de clase a DTO de presentación."""
 
     return DtoClasePresentacion(
         nombre=clase_dominio.nombre,
@@ -24,7 +24,7 @@ def mapear_clase_dominio_a_dto(clase_dominio: EspecificacionClase) -> DtoClasePr
 
 
 def mapear_dto_a_clase_dominio(dto: DtoClasePresentacion) -> EspecificacionClase:
-    """Convierte un DTO de presentación de clase en entidad de dominio."""
+    """Convierte un DTO de presentación de clase a entidad de dominio."""
 
     return EspecificacionClase(
         nombre=dto.nombre,

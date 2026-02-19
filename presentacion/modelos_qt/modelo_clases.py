@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 
-from presentacion.dtos import DtoClasePresentacion
+from aplicacion.dtos_presentacion import DtoClasePresentacion
 
 
 class ModeloClases(QAbstractTableModel):

@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from dominio.especificacion import EspecificacionAtributo, EspecificacionClase
-from presentacion.dtos import DtoAtributoPresentacion, DtoClasePresentacion
-from presentacion.mappers.mapper_dominio_a_presentacion import (
+from aplicacion.dtos_presentacion import DtoAtributoPresentacion, DtoClasePresentacion
+from aplicacion.mapeadores.mapeador_dominio_a_presentacion import (
     mapear_clase_dominio_a_dto,
     mapear_dto_a_clase_dominio,
 )

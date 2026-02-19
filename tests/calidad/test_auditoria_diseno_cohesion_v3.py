@@ -10,9 +10,7 @@ IMPORT_PROHIBIDO = {
     "Import prohibido aplicacion->infraestructura",
 }
 
-EXCEPCIONES_IMPORTS_JUSTIFICADAS = {
-    ("presentacion/mappers/mapper_dominio_a_presentacion.py", 5),
-}
+EXCEPCIONES_IMPORTS_JUSTIFICADAS: set[tuple[str, int]] = set()
 
 
 def test_auditoria_diseno_cohesion_v3_bloquea_regresiones() -> None:
