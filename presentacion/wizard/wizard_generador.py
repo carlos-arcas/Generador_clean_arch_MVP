@@ -200,7 +200,7 @@ class WizardGeneradorProyectos(QWizard):
 
     def _cargar_preset_desde_ui(self) -> None:
         try:
-            nombres = self._cargar_preset._almacen.listar()  # noqa: SLF001
+            nombres = self._cargar_preset.listar_presets()
             if not nombres:
                 QMessageBox.information(self, "Cargar preset", "No hay presets disponibles.")
                 return

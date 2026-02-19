@@ -17,3 +17,7 @@ class CargarPresetProyecto:
             return self._almacen.cargar(nombre_preset)
         except (ValueError, TypeError, KeyError) as exc:
             raise ErrorValidacion(f"Preset inválido: {exc}") from exc
+
+    def listar_presets(self) -> list[str]:
+        """Expone la lista de presets sin revelar detalles internos del almacén."""
+        return list(self._almacen.listar())
