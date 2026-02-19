@@ -67,6 +67,14 @@ class AuditarFinalizacionProyecto:
             accion="añade la clase Persona en la especificación o elimina crud_json del preset",
         ),
     )
+    _INCOMPATIBILIDADES_DECLARATIVAS: tuple[tuple[str, str, str], ...] = (
+        (
+            "crud_json",
+            "crud_sqlite",
+            "Incompatibilidad declarativa detectada: crud_json y crud_sqlite generan CRUD para la misma entidad. "
+            "Recomendación: elige 1 CRUD.",
+        ),
+    )
 
     def __init__(
         self,
@@ -81,8 +89,12 @@ class AuditarFinalizacionProyecto:
         self._ejecutor_procesos = ejecutor_procesos
 
     def ejecutar(self, entrada: DtoAuditoriaFinalizacionEntrada) -> DtoAuditoriaFinalizacionSalida:
-        contexto = self._preparar_contexto(entrada)
         etapas: list[ResultadoEtapa] = []
+        contexto, etapa_preparacion, evidencia_preparacion = self._medir_etapa(
+            lambda: self._preparar_contexto(entrada), "Preparación"
+        )
+        assert contexto is not None
+        etapas.append(etapa_preparacion)
         evidencias: dict[str, str] = {
             "meta_fecha_iso": contexto.fecha_iso,
             "meta_ruta_preset": entrada.ruta_preset,
@@ -91,10 +103,9 @@ class AuditarFinalizacionProyecto:
                 f"python -m presentacion.cli auditar-finalizacion --preset {entrada.ruta_preset} "
                 f"--sandbox {contexto.ruta_sandbox}"
             ),
-            "preparacion": f"Sandbox: {contexto.ruta_sandbox}\nEvidencias: {contexto.ruta_evidencias}",
+            "preparacion": evidencia_preparacion,
         }
         conflictos: ConflictosFinalizacion | None = None
-        etapas.append(ResultadoEtapa("Preparación", "PASS", 0, "Contexto listo"))
 
         preset, etapa_carga, evidencia_carga = self._medir_etapa(lambda: self._cargar_preset(entrada.ruta_preset), "Carga preset")
         etapas.append(etapa_carga)
@@ -158,23 +169,27 @@ class AuditarFinalizacionProyecto:
 
         return DtoAuditoriaFinalizacionSalida(contexto.id_ejecucion, str(contexto.ruta_sandbox), etapas, None, evidencias)
 
-    def _preparar_contexto(self, entrada: DtoAuditoriaFinalizacionEntrada) -> _ContextoEjecucion:
+    def _preparar_contexto(self, entrada: DtoAuditoriaFinalizacionEntrada):
         id_ejecucion = f"AUD-{datetime.now():%Y%m%d-%H%M%S}-{secrets.token_hex(2).upper()}"
         ruta_sandbox = entrada.resolver_ruta_sandbox(id_ejecucion=id_ejecucion, base_tmp=Path(tempfile.gettempdir())).resolve()
         ruta_evidencias = Path("docs") / "evidencias_finalizacion" / id_ejecucion
         ruta_evidencias.mkdir(parents=True, exist_ok=True)
         ruta_sandbox.mkdir(parents=True, exist_ok=True)
-        return _ContextoEjecucion(
+        contexto = _ContextoEjecucion(
             id_ejecucion=id_ejecucion,
             fecha_iso=datetime.now().isoformat(timespec="seconds"),
             ruta_sandbox=ruta_sandbox,
             ruta_evidencias=ruta_evidencias,
         )
+        evidencia = f"Sandbox: {contexto.ruta_sandbox}\nEvidencias: {contexto.ruta_evidencias}"
+        return contexto, "PASS", "Contexto listo", evidencia, None
 
     def _medir_etapa(self, accion, nombre_etapa: str):  # type: ignore[no-untyped-def]
         inicio = time.perf_counter()
         resultado, estado, resumen, evidencia, fallo = accion()
         duracion_ms = int((time.perf_counter() - inicio) * 1000)
+        if estado in {"PASS", "FAIL"} and duracion_ms == 0:
+            duracion_ms = 1
         etapa = ResultadoEtapa(
             nombre=nombre_etapa,
             estado=estado,
@@ -211,6 +226,8 @@ class AuditarFinalizacionProyecto:
         especificacion = self._construir_especificacion(preset)
         blueprints = [str(item) for item in preset["blueprints"]]
         clases = list(especificacion.clases)
+        warnings = self._warnings_incompatibilidades(blueprints)
+        prefijo_warnings = self._serializar_warnings(warnings)
 
         for regla in self._REGLAS_BLUEPRINTS:
             if regla.blueprint not in blueprints:
@@ -223,7 +240,8 @@ class AuditarFinalizacionProyecto:
                 )
                 exc = ErrorValidacionDominio("El blueprint crud_json requiere al menos una clase en la especificación.")
                 fallo = self._crear_fallo(exc=exc, codigo="VAL-001", mensaje_usuario=mensaje, tipo_forzado=VALIDACION)
-                return None, "FAIL", "Validación de blueprint fallida", fallo.detalle_tecnico, fallo
+                evidencia = f"{prefijo_warnings}\n\n{fallo.detalle_tecnico}" if prefijo_warnings else fallo.detalle_tecnico
+                return None, "FAIL", "Validación de blueprint fallida", evidencia, fallo
             if regla.regla == "requiere entidad 'persona'" and clases and not self._existe_clase_persona(clases):
                 mensaje = (
                     "crud_json requiere entidad persona. Blueprint culpable: crud_json. "
@@ -232,9 +250,11 @@ class AuditarFinalizacionProyecto:
                 )
                 exc = ErrorValidacionDominio("El blueprint crud_json requiere entidad Persona.")
                 fallo = self._crear_fallo(exc=exc, codigo="VAL-002", mensaje_usuario=mensaje, tipo_forzado=VALIDACION)
-                return None, "FAIL", "Validación de blueprint fallida", fallo.detalle_tecnico, fallo
+                evidencia = f"{prefijo_warnings}\n\n{fallo.detalle_tecnico}" if prefijo_warnings else fallo.detalle_tecnico
+                return None, "FAIL", "Validación de blueprint fallida", evidencia, fallo
 
-        return None, "PASS", "Validación de entrada OK", "Reglas de blueprint satisfechas", None
+        evidencia = prefijo_warnings or "Reglas de blueprint satisfechas"
+        return None, "PASS", "Validación de entrada OK", evidencia, None
 
     def _preflight_conflictos_rutas(self, preset: dict[str, object]):
         especificacion = self._construir_especificacion(preset)
@@ -267,9 +287,10 @@ class AuditarFinalizacionProyecto:
             exc = ErrorConflictoArchivos(f"Rutas duplicadas detectadas: {len(rutas)}")
             fallo = self._crear_fallo(exc=exc, codigo="CON-001", mensaje_usuario=mensaje_usuario, tipo_forzado=CONFLICTO)
             evidencia = (
-                f"Total rutas duplicadas: {len(rutas)}\n"
+                f"total rutas duplicadas: {len(rutas)}\n"
                 "Ejemplos ruta -> [blueprints]:\n"
                 f"{top}\n\n"
+                "Recomendación: No selecciones más de 1 blueprint CRUD para la misma entidad.\n\n"
                 f"{fallo.detalle_tecnico}"
             )
             return conflicto, "FAIL", "Rutas duplicadas detectadas", evidencia, fallo
@@ -383,13 +404,16 @@ class AuditarFinalizacionProyecto:
 
     def _detalle_tecnico(self, exc: Exception) -> str:
         origen = self._origen_excepcion(exc.__traceback__)
+        linea_raise = self._linea_raise(exc.__traceback__)
         stack = traceback.format_exception(type(exc), exc, exc.__traceback__)
-        stack_lineas = "".join(stack).splitlines()[:60]
+        stack_lineas_completas = "".join(stack).splitlines()
+        stack_lineas = stack_lineas_completas[-40:]
         stacktrace = "\n".join(stack_lineas)
         return (
             f"excepcion_tipo: {type(exc).__name__}\n"
             f"excepcion_mensaje: {exc}\n"
             f"origen: {origen}\n"
+            f"linea_raise: {linea_raise}\n"
             f"stacktrace_recortado:\n{stacktrace}"
         )
 
@@ -401,6 +425,29 @@ class AuditarFinalizacionProyecto:
             return "N/D"
         final = resumen[-1]
         return f"{Path(final.filename).name}:{final.name}:{final.lineno}"
+
+    def _linea_raise(self, traza: TracebackType | None) -> str:
+        if traza is None:
+            return "N/D"
+        resumen = traceback.extract_tb(traza)
+        if not resumen:
+            return "N/D"
+        final = resumen[-1]
+        return f"{Path(final.filename).name}:{final.lineno}"
+
+    def _warnings_incompatibilidades(self, blueprints: list[str]) -> list[str]:
+        seleccion = set(blueprints)
+        warnings: list[str] = []
+        for izquierda, derecha, mensaje in self._INCOMPATIBILIDADES_DECLARATIVAS:
+            if izquierda in seleccion and derecha in seleccion:
+                warnings.append(mensaje)
+        return warnings
+
+    def _serializar_warnings(self, warnings: list[str]) -> str:
+        if not warnings:
+            return ""
+        listado = "\n".join(f"- {warning}" for warning in warnings)
+        return f"Warnings declarativos:\n{listado}"
 
     def _anexar_etapas_skip(self, etapas: list[ResultadoEtapa], motivo: str) -> None:
         etapas.extend(
