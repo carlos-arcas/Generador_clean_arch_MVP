@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-import traceback
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
+from aplicacion.errores import ErrorAplicacion, ErrorInfraestructura
 from aplicacion.casos_uso.generacion.generar_proyecto_mvp import GenerarProyectoMvp, GenerarProyectoMvpEntrada
 
 LOGGER = logging.getLogger(__name__)
@@ -38,8 +38,18 @@ class TrabajadorGeneracionMvp(QRunnable):
                 detalle = "\n".join(salida.errores) if salida.errores else "Sin detalles adicionales"
                 LOGGER.warning("Generación completada con auditoría inválida: %s", detalle)
             self.senales.exito.emit(salida)
-        except Exception as exc:  # pragma: no cover - protección adicional
-            LOGGER.error("Excepción no controlada en trabajador MVP: %s", exc)
-            detalle = traceback.format_exc()
-            LOGGER.error("Stacktrace worker MVP:\n%s", detalle)
-            self.senales.error.emit("Falló la generación (ver logs)", detalle)
+        except ErrorInfraestructura as exc:
+            LOGGER.error("Fallo en trabajador de generación", exc_info=True)
+            self.senales.error.emit(
+                "No se pudo completar la generación del proyecto por un problema de infraestructura.",
+                str(exc),
+            )
+        except ErrorAplicacion as exc:
+            LOGGER.error("Fallo en trabajador de generación", exc_info=True)
+            self.senales.error.emit("No se pudo completar la generación del proyecto.", str(exc))
+        except OSError as exc:
+            LOGGER.error("Fallo en trabajador de generación", exc_info=True)
+            self.senales.error.emit("No se pudo completar la generación del proyecto.", str(exc))
+        except ValueError as exc:
+            LOGGER.error("Fallo en trabajador de generación", exc_info=True)
+            self.senales.error.emit("No se pudo completar la generación del proyecto.", str(exc))
