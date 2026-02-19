@@ -23,6 +23,7 @@ from aplicacion.casos_uso.generacion.generar_proyecto_mvp import (
 from aplicacion.casos_uso.presets import CargarPresetProyecto, GuardarPresetProyecto
 from aplicacion.casos_uso.seguridad import GuardarCredencial
 from aplicacion.dtos.proyecto import DtoAtributo, DtoClase, DtoProyectoEntrada
+from aplicacion.errores import ErrorInfraestructura, ErrorValidacionEntrada
 from presentacion.wizard.dtos import DatosWizardProyecto
 from presentacion.wizard.orquestadores.orquestador_finalizacion_wizard import (
     DtoEntradaFinalizacionWizard,
@@ -194,9 +195,16 @@ class WizardGeneradorProyectos(QWizard):
                 metadata={"persistencia": self.pagina_persistencia.persistencia_seleccionada()},
             )
             QMessageBox.information(self, "Guardar preset", f"Preset guardado en: {ruta}")
-        except Exception as exc:  # noqa: BLE001
-            LOGGER.error("No se pudo guardar preset: %s", exc)
+        except ErrorValidacionEntrada as exc:
+            LOGGER.warning("Error de validación al guardar preset: %s", exc, exc_info=True)
             QMessageBox.critical(self, "Guardar preset", str(exc))
+        except (ErrorInfraestructura, OSError, PermissionError, IOError) as exc:
+            LOGGER.error("Error técnico al guardar preset.", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Guardar preset",
+                "No se pudo guardar el preset por un error técnico de infraestructura.",
+            )
 
     def _cargar_preset_desde_ui(self) -> None:
         try:
@@ -216,9 +224,16 @@ class WizardGeneradorProyectos(QWizard):
             preset = self._cargar_preset.ejecutar(nombre)
             self.aplicar_preset(preset)
             QMessageBox.information(self, "Cargar preset", f"Preset '{nombre}' cargado.")
-        except Exception as exc:  # noqa: BLE001
-            LOGGER.error("No se pudo cargar preset: %s", exc)
+        except ErrorValidacionEntrada as exc:
+            LOGGER.warning("Error de validación al cargar preset: %s", exc, exc_info=True)
             QMessageBox.critical(self, "Cargar preset", str(exc))
+        except (ErrorInfraestructura, OSError, PermissionError, IOError) as exc:
+            LOGGER.error("Error técnico al cargar preset.", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Cargar preset",
+                "No se pudo cargar el preset por un error técnico de infraestructura.",
+            )
 
     def aplicar_preset(self, preset: object) -> None:
         especificacion = getattr(preset, "especificacion")
