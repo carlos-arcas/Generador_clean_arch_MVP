@@ -1,0 +1,47 @@
+import pytest
+
+from dominio.entidades.cliente import Cliente
+from infraestructura.persistencia.json.repositorio_cliente_json import RepositorioClienteJson
+
+
+def test_crear_ok(tmp_path) -> None:
+    repo = RepositorioClienteJson(str(tmp_path))
+
+    creado = repo.crear(Cliente(id=0, nombre="valor", edad=10, activo=True))
+
+    assert creado.id == 1
+    assert creado.nombre == "valor"
+
+
+def test_obtener_inexistente_error(tmp_path) -> None:
+    repo = RepositorioClienteJson(str(tmp_path))
+
+    with pytest.raises(ValueError, match="no encontrado"):
+        repo.obtener_por_id(404)
+
+
+def test_actualizar(tmp_path) -> None:
+    repo = RepositorioClienteJson(str(tmp_path))
+    creado = repo.crear(Cliente(id=0, nombre="valor", edad=10, activo=True))
+
+    actualizado = repo.actualizar(
+        Cliente(id=creado.id, nombre="valor_upd", edad=20, activo=False)
+    )
+
+    assert actualizado.nombre == "valor_upd"
+
+
+def test_eliminar(tmp_path) -> None:
+    repo = RepositorioClienteJson(str(tmp_path))
+    creado = repo.crear(Cliente(id=0, nombre="valor", edad=10, activo=True))
+
+    repo.eliminar(creado.id)
+
+    with pytest.raises(ValueError, match="no encontrado"):
+        repo.obtener_por_id(creado.id)
+
+
+def test_listar_vacio_y_borde(tmp_path) -> None:
+    repo = RepositorioClienteJson(str(tmp_path))
+
+    assert repo.listar() == []

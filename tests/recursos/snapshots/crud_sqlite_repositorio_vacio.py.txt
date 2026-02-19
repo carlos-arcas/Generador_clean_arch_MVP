@@ -1,0 +1,109 @@
+"""Implementación SQLite del repositorio de Vacio."""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+import sqlite3
+
+from aplicacion.puertos.repositorio_vacio import RepositorioVacio
+from dominio.entidades.vacio import Vacio
+
+LOGGER = logging.getLogger(__name__)
+
+
+class RepositorioVacioSqlite(RepositorioVacio):
+    def __init__(self, ruta_base: str) -> None:
+        self._ruta_db = Path(ruta_base) / "datos" / "base_datos.db"
+        self._ruta_db.parent.mkdir(parents=True, exist_ok=True)
+        self._asegurar_tabla()
+
+
+    def crear(self, entidad: Vacio) -> Vacio:
+        try:
+            with self._conectar() as conexion:
+                cursor = conexion.execute("INSERT INTO vacios DEFAULT VALUES", ())
+                persistida = Vacio(id=int(cursor.lastrowid))
+                LOGGER.info("Vacio creada id=%s", persistida.id)
+                return persistida
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al crear Vacio")
+            raise ValueError("Error SQL al crear entidad") from exc
+
+    def obtener_por_id(self, entidad_id: int) -> Vacio:
+        try:
+            with self._conectar() as conexion:
+                fila = conexion.execute(
+                    "SELECT * FROM vacios WHERE id = ?",
+                    (entidad_id,),
+                ).fetchone()
+                if fila is None:
+                    raise ValueError("Vacio no encontrado")
+                return self._fila_a_entidad(fila)
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al obtener Vacio id=%s", entidad_id)
+            raise ValueError("Error SQL al obtener entidad") from exc
+
+    def listar(self) -> list[Vacio]:
+        try:
+            with self._conectar() as conexion:
+                filas = conexion.execute(
+                    "SELECT * FROM vacios ORDER BY id ASC"
+                ).fetchall()
+                entidades = [self._fila_a_entidad(fila) for fila in filas]
+                LOGGER.info("Listado de Vacio: %s elementos", len(entidades))
+                return entidades
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al listar Vacio")
+            raise ValueError("Error SQL al listar entidades") from exc
+
+    def actualizar(self, entidad: Vacio) -> Vacio:
+        try:
+            with self._conectar() as conexion:
+                cursor = conexion.execute(
+                    "UPDATE vacios SET id = id WHERE id = ?",
+                    (entidad.id,),
+                )
+                if cursor.rowcount == 0:
+                    raise ValueError("Vacio no encontrado")
+                LOGGER.info("Vacio actualizada id=%s", entidad.id)
+                return entidad
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al actualizar Vacio id=%s", entidad.id)
+            raise ValueError("Error SQL al actualizar entidad") from exc
+
+    def eliminar(self, entidad_id: int) -> None:
+        try:
+            with self._conectar() as conexion:
+                cursor = conexion.execute(
+                    "DELETE FROM vacios WHERE id = ?",
+                    (entidad_id,),
+                )
+                if cursor.rowcount == 0:
+                    raise ValueError("Vacio no encontrado")
+                LOGGER.info("Vacio eliminada id=%s", entidad_id)
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al eliminar Vacio id=%s", entidad_id)
+            raise ValueError("Error SQL al eliminar entidad") from exc
+
+    def _asegurar_tabla(self) -> None:
+        LOGGER.info("Creando tabla vacios si no existe")
+        with self._conectar() as conexion:
+            conexion.execute(
+                """
+                CREATE TABLE IF NOT EXISTS vacios (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT
+                )
+                """
+            )
+
+    def _conectar(self) -> sqlite3.Connection:
+        conexion = sqlite3.connect(self._ruta_db)
+        conexion.row_factory = sqlite3.Row
+        return conexion
+
+    def _fila_a_entidad(self, fila: sqlite3.Row) -> Vacio:
+        return Vacio(
+            id=int(fila["id"]),
+
+        )

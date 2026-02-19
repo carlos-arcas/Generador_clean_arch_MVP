@@ -1,0 +1,114 @@
+"""Implementación SQLite del repositorio de Cliente."""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+import sqlite3
+
+from aplicacion.puertos.repositorio_cliente import RepositorioCliente
+from dominio.entidades.cliente import Cliente
+
+LOGGER = logging.getLogger(__name__)
+
+
+class RepositorioClienteSqlite(RepositorioCliente):
+    def __init__(self, ruta_base: str) -> None:
+        self._ruta_db = Path(ruta_base) / "datos" / "base_datos.db"
+        self._ruta_db.parent.mkdir(parents=True, exist_ok=True)
+        self._asegurar_tabla()
+
+
+    def crear(self, entidad: Cliente) -> Cliente:
+        try:
+            with self._conectar() as conexion:
+                cursor = conexion.execute("INSERT INTO clientes (nombre, edad, activo) VALUES (?, ?, ?)", (entidad.nombre, entidad.edad, entidad.activo,))
+                persistida = Cliente(id=int(cursor.lastrowid), nombre=entidad.nombre, edad=entidad.edad, activo=entidad.activo)
+                LOGGER.info("Cliente creada id=%s", persistida.id)
+                return persistida
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al crear Cliente")
+            raise ValueError("Error SQL al crear entidad") from exc
+
+    def obtener_por_id(self, entidad_id: int) -> Cliente:
+        try:
+            with self._conectar() as conexion:
+                fila = conexion.execute(
+                    "SELECT * FROM clientes WHERE id = ?",
+                    (entidad_id,),
+                ).fetchone()
+                if fila is None:
+                    raise ValueError("Cliente no encontrado")
+                return self._fila_a_entidad(fila)
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al obtener Cliente id=%s", entidad_id)
+            raise ValueError("Error SQL al obtener entidad") from exc
+
+    def listar(self) -> list[Cliente]:
+        try:
+            with self._conectar() as conexion:
+                filas = conexion.execute(
+                    "SELECT * FROM clientes ORDER BY id ASC"
+                ).fetchall()
+                entidades = [self._fila_a_entidad(fila) for fila in filas]
+                LOGGER.info("Listado de Cliente: %s elementos", len(entidades))
+                return entidades
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al listar Cliente")
+            raise ValueError("Error SQL al listar entidades") from exc
+
+    def actualizar(self, entidad: Cliente) -> Cliente:
+        try:
+            with self._conectar() as conexion:
+                cursor = conexion.execute(
+                    "UPDATE clientes SET nombre = ?, edad = ?, activo = ? WHERE id = ?",
+                    (entidad.nombre, entidad.edad, entidad.activo, entidad.id),
+                )
+                if cursor.rowcount == 0:
+                    raise ValueError("Cliente no encontrado")
+                LOGGER.info("Cliente actualizada id=%s", entidad.id)
+                return entidad
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al actualizar Cliente id=%s", entidad.id)
+            raise ValueError("Error SQL al actualizar entidad") from exc
+
+    def eliminar(self, entidad_id: int) -> None:
+        try:
+            with self._conectar() as conexion:
+                cursor = conexion.execute(
+                    "DELETE FROM clientes WHERE id = ?",
+                    (entidad_id,),
+                )
+                if cursor.rowcount == 0:
+                    raise ValueError("Cliente no encontrado")
+                LOGGER.info("Cliente eliminada id=%s", entidad_id)
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al eliminar Cliente id=%s", entidad_id)
+            raise ValueError("Error SQL al eliminar entidad") from exc
+
+    def _asegurar_tabla(self) -> None:
+        LOGGER.info("Creando tabla clientes si no existe")
+        with self._conectar() as conexion:
+            conexion.execute(
+                """
+                CREATE TABLE IF NOT EXISTS clientes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT,
+                edad INTEGER,
+                activo INTEGER
+                )
+                """
+            )
+
+    def _conectar(self) -> sqlite3.Connection:
+        conexion = sqlite3.connect(self._ruta_db)
+        conexion.row_factory = sqlite3.Row
+        return conexion
+
+    def _fila_a_entidad(self, fila: sqlite3.Row) -> Cliente:
+        return Cliente(
+            id=int(fila["id"]),
+            nombre=fila['nombre'],
+            edad=fila['edad'],
+            activo=bool(fila['activo']),
+        )

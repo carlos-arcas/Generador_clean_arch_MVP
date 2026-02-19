@@ -77,17 +77,16 @@ class CrudSqliteBlueprint(CrudJsonBlueprint):
         }
         return normalizados.get(tipo.lower(), "TEXT")
 
-    def _contenido_repositorio_sqlite(self, clase: EspecificacionClase, nombres: NombresClase) -> str:
+    def _datos_repositorio_sqlite(self, clase: EspecificacionClase) -> dict[str, str]:
         atributos_sin_id = [atributo for atributo in clase.atributos if atributo.nombre != "id"]
         columnas_sql = ["id INTEGER PRIMARY KEY AUTOINCREMENT"] + [
             f"{atributo.nombre} {self._tipo_sqlite(atributo.tipo)}" for atributo in atributos_sin_id
         ]
-        columnas_sql_texto = ",\n                ".join(columnas_sql)
 
         if atributos_sin_id:
             nombres_columnas = ", ".join(atributo.nombre for atributo in atributos_sin_id)
             placeholders = ", ".join("?" for _ in atributos_sin_id)
-            insert_sql = f'"INSERT INTO {nombres.nombre_plural} ({nombres_columnas}) VALUES ({placeholders})"'
+            insert_sql = f'"INSERT INTO {{nombres.nombre_plural}} ({nombres_columnas}) VALUES ({placeholders})"'
             params_crear = f"({', '.join(f'entidad.{atributo.nombre}' for atributo in atributos_sin_id)},)"
             set_clause = ", ".join(f"{atributo.nombre} = ?" for atributo in atributos_sin_id)
             params_actualizar = (
@@ -96,7 +95,7 @@ class CrudSqliteBlueprint(CrudJsonBlueprint):
             retorno_crear = ", ".join(f"{atributo.nombre}=entidad.{atributo.nombre}" for atributo in atributos_sin_id)
             retorno_crear = f", {retorno_crear}" if retorno_crear else ""
         else:
-            insert_sql = f'"INSERT INTO {nombres.nombre_plural} DEFAULT VALUES"'
+            insert_sql = '"INSERT INTO {nombres.nombre_plural} DEFAULT VALUES"'
             params_crear = "()"
             set_clause = "id = id"
             params_actualizar = "(entidad.id,)"
@@ -109,8 +108,32 @@ class CrudSqliteBlueprint(CrudJsonBlueprint):
                 conversiones.append(f"            {atributo.nombre}=bool(fila['{atributo.nombre}']),")
             else:
                 conversiones.append(f"            {atributo.nombre}=fila['{atributo.nombre}'],")
-        conversiones_texto = "\n".join(conversiones)
 
+        return {
+            "insert_sql": insert_sql,
+            "params_crear": params_crear,
+            "set_clause": set_clause,
+            "params_actualizar": params_actualizar,
+            "retorno_crear": retorno_crear,
+            "columnas_sql_texto": ",\n                ".join(columnas_sql),
+            "conversiones_texto": "\n".join(conversiones),
+        }
+
+    def _contenido_repositorio_sqlite(self, clase: EspecificacionClase, nombres: NombresClase) -> str:
+        datos = self._datos_repositorio_sqlite(clase)
+        partes = [
+            self._generar_imports_repositorio(nombres),
+            self._generar_definicion_clase(nombres),
+            self._generar_metodo_guardar(nombres, datos),
+            self._generar_metodo_obtener(nombres),
+            self._generar_metodo_listar(nombres),
+            self._generar_metodo_actualizar(nombres, datos),
+            self._generar_metodo_eliminar(nombres),
+            self._generar_utilidades_repositorio(nombres, datos),
+        ]
+        return "\n\n".join(partes)
+
+    def _generar_imports_repositorio(self, nombres: NombresClase) -> str:
         return textwrap.dedent(
             f'''\
             """Implementación SQLite del repositorio de {nombres.nombre_clase}."""
@@ -125,104 +148,114 @@ class CrudSqliteBlueprint(CrudJsonBlueprint):
             from dominio.entidades.{nombres.nombre_snake} import {nombres.nombre_clase}
 
             LOGGER = logging.getLogger(__name__)
+            '''
+        )
 
-
+    def _generar_definicion_clase(self, nombres: NombresClase) -> str:
+        return textwrap.dedent(
+            f'''\
             class Repositorio{nombres.nombre_clase}Sqlite(Repositorio{nombres.nombre_clase}):
                 def __init__(self, ruta_base: str) -> None:
                     self._ruta_db = Path(ruta_base) / "datos" / "base_datos.db"
                     self._ruta_db.parent.mkdir(parents=True, exist_ok=True)
                     self._asegurar_tabla()
-
-                def crear(self, entidad: {nombres.nombre_clase}) -> {nombres.nombre_clase}:
-                    try:
-                        with self._conectar() as conexion:
-                            cursor = conexion.execute({insert_sql}, {params_crear})
-                            persistida = {nombres.nombre_clase}(id=int(cursor.lastrowid){retorno_crear})
-                            LOGGER.info("{nombres.nombre_clase} creada id=%s", persistida.id)
-                            return persistida
-                    except sqlite3.Error as exc:
-                        LOGGER.exception("Error SQL al crear {nombres.nombre_clase}")
-                        raise ValueError("Error SQL al crear entidad") from exc
-
-                def obtener_por_id(self, entidad_id: int) -> {nombres.nombre_clase}:
-                    try:
-                        with self._conectar() as conexion:
-                            fila = conexion.execute(
-                                "SELECT * FROM {nombres.nombre_plural} WHERE id = ?",
-                                (entidad_id,),
-                            ).fetchone()
-                            if fila is None:
-                                raise ValueError("{nombres.nombre_clase} no encontrado")
-                            return self._fila_a_entidad(fila)
-                    except sqlite3.Error as exc:
-                        LOGGER.exception("Error SQL al obtener {nombres.nombre_clase} id=%s", entidad_id)
-                        raise ValueError("Error SQL al obtener entidad") from exc
-
-                def listar(self) -> list[{nombres.nombre_clase}]:
-                    try:
-                        with self._conectar() as conexion:
-                            filas = conexion.execute(
-                                "SELECT * FROM {nombres.nombre_plural} ORDER BY id ASC"
-                            ).fetchall()
-                            entidades = [self._fila_a_entidad(fila) for fila in filas]
-                            LOGGER.info("Listado de {nombres.nombre_clase}: %s elementos", len(entidades))
-                            return entidades
-                    except sqlite3.Error as exc:
-                        LOGGER.exception("Error SQL al listar {nombres.nombre_clase}")
-                        raise ValueError("Error SQL al listar entidades") from exc
-
-                def actualizar(self, entidad: {nombres.nombre_clase}) -> {nombres.nombre_clase}:
-                    try:
-                        with self._conectar() as conexion:
-                            cursor = conexion.execute(
-                                "UPDATE {nombres.nombre_plural} SET {set_clause} WHERE id = ?",
-                                {params_actualizar},
-                            )
-                            if cursor.rowcount == 0:
-                                raise ValueError("{nombres.nombre_clase} no encontrado")
-                            LOGGER.info("{nombres.nombre_clase} actualizada id=%s", entidad.id)
-                            return entidad
-                    except sqlite3.Error as exc:
-                        LOGGER.exception("Error SQL al actualizar {nombres.nombre_clase} id=%s", entidad.id)
-                        raise ValueError("Error SQL al actualizar entidad") from exc
-
-                def eliminar(self, entidad_id: int) -> None:
-                    try:
-                        with self._conectar() as conexion:
-                            cursor = conexion.execute(
-                                "DELETE FROM {nombres.nombre_plural} WHERE id = ?",
-                                (entidad_id,),
-                            )
-                            if cursor.rowcount == 0:
-                                raise ValueError("{nombres.nombre_clase} no encontrado")
-                            LOGGER.info("{nombres.nombre_clase} eliminada id=%s", entidad_id)
-                    except sqlite3.Error as exc:
-                        LOGGER.exception("Error SQL al eliminar {nombres.nombre_clase} id=%s", entidad_id)
-                        raise ValueError("Error SQL al eliminar entidad") from exc
-
-                def _asegurar_tabla(self) -> None:
-                    LOGGER.info("Creando tabla {nombres.nombre_plural} si no existe")
-                    with self._conectar() as conexion:
-                        conexion.execute(
-                            """
-                            CREATE TABLE IF NOT EXISTS {nombres.nombre_plural} (
-                                {columnas_sql_texto}
-                            )
-                            """
-                        )
-
-                def _conectar(self) -> sqlite3.Connection:
-                    conexion = sqlite3.connect(self._ruta_db)
-                    conexion.row_factory = sqlite3.Row
-                    return conexion
-
-                def _fila_a_entidad(self, fila: sqlite3.Row) -> {nombres.nombre_clase}:
-                    return {nombres.nombre_clase}(
-                        id=int(fila["id"]),
-            {conversiones_texto}
-                    )
             '''
         )
+
+    def _generar_metodo_guardar(self, nombres: NombresClase, datos: dict[str, str]) -> str:
+        return f'''    def crear(self, entidad: {nombres.nombre_clase}) -> {nombres.nombre_clase}:
+        try:
+            with self._conectar() as conexion:
+                cursor = conexion.execute({datos["insert_sql"].format(nombres=nombres)}, {datos["params_crear"]})
+                persistida = {nombres.nombre_clase}(id=int(cursor.lastrowid){datos["retorno_crear"]})
+                LOGGER.info("{nombres.nombre_clase} creada id=%s", persistida.id)
+                return persistida
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al crear {nombres.nombre_clase}")
+            raise ValueError("Error SQL al crear entidad") from exc'''
+
+    def _generar_metodo_obtener(self, nombres: NombresClase) -> str:
+        return f'''    def obtener_por_id(self, entidad_id: int) -> {nombres.nombre_clase}:
+        try:
+            with self._conectar() as conexion:
+                fila = conexion.execute(
+                    "SELECT * FROM {nombres.nombre_plural} WHERE id = ?",
+                    (entidad_id,),
+                ).fetchone()
+                if fila is None:
+                    raise ValueError("{nombres.nombre_clase} no encontrado")
+                return self._fila_a_entidad(fila)
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al obtener {nombres.nombre_clase} id=%s", entidad_id)
+            raise ValueError("Error SQL al obtener entidad") from exc'''
+
+    def _generar_metodo_listar(self, nombres: NombresClase) -> str:
+        return f'''    def listar(self) -> list[{nombres.nombre_clase}]:
+        try:
+            with self._conectar() as conexion:
+                filas = conexion.execute(
+                    "SELECT * FROM {nombres.nombre_plural} ORDER BY id ASC"
+                ).fetchall()
+                entidades = [self._fila_a_entidad(fila) for fila in filas]
+                LOGGER.info("Listado de {nombres.nombre_clase}: %s elementos", len(entidades))
+                return entidades
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al listar {nombres.nombre_clase}")
+            raise ValueError("Error SQL al listar entidades") from exc'''
+
+    def _generar_metodo_actualizar(self, nombres: NombresClase, datos: dict[str, str]) -> str:
+        return f'''    def actualizar(self, entidad: {nombres.nombre_clase}) -> {nombres.nombre_clase}:
+        try:
+            with self._conectar() as conexion:
+                cursor = conexion.execute(
+                    "UPDATE {nombres.nombre_plural} SET {datos['set_clause']} WHERE id = ?",
+                    {datos['params_actualizar']},
+                )
+                if cursor.rowcount == 0:
+                    raise ValueError("{nombres.nombre_clase} no encontrado")
+                LOGGER.info("{nombres.nombre_clase} actualizada id=%s", entidad.id)
+                return entidad
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al actualizar {nombres.nombre_clase} id=%s", entidad.id)
+            raise ValueError("Error SQL al actualizar entidad") from exc'''
+
+    def _generar_metodo_eliminar(self, nombres: NombresClase) -> str:
+        return f'''    def eliminar(self, entidad_id: int) -> None:
+        try:
+            with self._conectar() as conexion:
+                cursor = conexion.execute(
+                    "DELETE FROM {nombres.nombre_plural} WHERE id = ?",
+                    (entidad_id,),
+                )
+                if cursor.rowcount == 0:
+                    raise ValueError("{nombres.nombre_clase} no encontrado")
+                LOGGER.info("{nombres.nombre_clase} eliminada id=%s", entidad_id)
+        except sqlite3.Error as exc:
+            LOGGER.exception("Error SQL al eliminar {nombres.nombre_clase} id=%s", entidad_id)
+            raise ValueError("Error SQL al eliminar entidad") from exc'''
+
+    def _generar_utilidades_repositorio(self, nombres: NombresClase, datos: dict[str, str]) -> str:
+        return f'''    def _asegurar_tabla(self) -> None:
+        LOGGER.info("Creando tabla {nombres.nombre_plural} si no existe")
+        with self._conectar() as conexion:
+            conexion.execute(
+                """
+                CREATE TABLE IF NOT EXISTS {nombres.nombre_plural} (
+                    {datos['columnas_sql_texto']}
+                )
+                """
+            )
+
+    def _conectar(self) -> sqlite3.Connection:
+        conexion = sqlite3.connect(self._ruta_db)
+        conexion.row_factory = sqlite3.Row
+        return conexion
+
+    def _fila_a_entidad(self, fila: sqlite3.Row) -> {nombres.nombre_clase}:
+        return {nombres.nombre_clase}(
+            id=int(fila["id"]),
+{datos['conversiones_texto']}
+        )'''
 
     def _contenido_test_crud_sqlite(self, clase: EspecificacionClase, nombres: NombresClase) -> str:
         contenido_json = self._contenido_test_crud(clase, nombres)
