@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from aplicacion.errores import ErrorAplicacion
+from presentacion.mapeo_mensajes_error import MensajeUxError
 from presentacion.trabajadores.trabajador_generacion import TrabajadorGeneracionMvp
 
 
@@ -49,10 +50,11 @@ def test_error_aplicacion_emite_error_y_loguea_stacktrace(caplog: pytest.LogCapt
         trabajador.run()
 
     assert senales.error.eventos
-    mensaje_usuario, detalle = senales.error.eventos[0]
-    assert mensaje_usuario == "No se pudo completar la generación del proyecto."
-    assert detalle == "fallo de dominio"
-    assert "Fallo en trabajador de generación" in caplog.text
+    (mensaje_ux,) = senales.error.eventos[0]
+    assert isinstance(mensaje_ux, MensajeUxError)
+    assert "ID de incidente" in mensaje_ux.mensaje
+    assert "falló mvp" not in mensaje_ux.mensaje.lower()
+    assert "id_incidente=" in caplog.text
     assert any(registro.exc_info for registro in caplog.records)
 
 
@@ -63,10 +65,11 @@ def test_oserror_emite_error_generico_y_loguea_stacktrace(caplog: pytest.LogCapt
         trabajador.run()
 
     assert senales.error.eventos
-    mensaje_usuario, detalle = senales.error.eventos[0]
-    assert mensaje_usuario == "No se pudo completar la generación del proyecto."
-    assert detalle == "sin permisos"
-    assert "Fallo en trabajador de generación" in caplog.text
+    (mensaje_ux,) = senales.error.eventos[0]
+    assert isinstance(mensaje_ux, MensajeUxError)
+    assert mensaje_ux.causa_probable is not None
+    assert mensaje_ux.acciones
+    assert "id_incidente=" in caplog.text
     assert any(registro.exc_info for registro in caplog.records)
 
 

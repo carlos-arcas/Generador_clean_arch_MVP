@@ -32,7 +32,15 @@ def _crear_repo_minimo(base: Path) -> None:
     _crear_archivo(base / "dominio" / "entidad.py", "def funcion_publica() -> int:\n    return 1\n")
     _crear_archivo(base / "aplicacion" / "servicio.py", "class Servicio:\n    pass\n")
     _crear_archivo(base / "infraestructura" / "logging_config.py", "from logging.handlers import RotatingFileHandler\nimport sys\nFORMATO='%(asctime)s %(levelname)s %(message)s'\nsys.excepthook = lambda *args: None\n")
-    _crear_archivo(base / "presentacion" / "mapeo_mensajes_error.py", "MAPEO = {}\n")
+    _crear_archivo(base / "presentacion" / "mapeo_mensajes_error.py", "def mapear_error_a_mensaje_ux(*_args):\n    return None\n")
+    _crear_archivo(
+        base / "presentacion" / "dialogo_error.py",
+        "from PySide6.QtWidgets import QMessageBox\n"
+        "from presentacion.mapeo_mensajes_error import mapear_error_a_mensaje_ux\n"
+        "def mostrar(exc):\n"
+        "    mapear_error_a_mensaje_ux(exc, 'ID', None)\n"
+        "    QMessageBox.critical(None, 'Error', 'ID de incidente: ID')\n",
+    )
 
     _crear_archivo(base / "tests" / "dominio" / "test_entidad.py", "from dominio.entidad import funcion_publica\n\ndef test_ok():\n    assert funcion_publica() == 1\n")
     _crear_archivo(base / "tests" / "aplicacion" / "test_servicio.py", "from aplicacion.servicio import Servicio\n\ndef test_servicio():\n    assert Servicio is not None\n")
