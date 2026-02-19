@@ -349,6 +349,21 @@ class CrudJsonBlueprint(Blueprint):
         )
 
     def _contenido_repositorio_json(self, nombres: NombresClase) -> str:
+        partes = [
+            self._generar_imports_repositorio_json(nombres),
+            self._generar_definicion_clase_repositorio_json(nombres),
+            self._generar_metodo_guardar_json(nombres),
+            self._generar_metodo_obtener_json(nombres),
+            self._generar_metodo_listar_json(nombres),
+            self._generar_metodo_actualizar_json(nombres),
+            self._generar_metodo_eliminar_json(nombres),
+            self._generar_utilidades_json(),
+        ]
+        primera_parte = partes[0].rstrip("\n")
+        resto = "\n\n".join(parte.strip("\n") for parte in partes[1:])
+        return f"{primera_parte}\n\n\n{resto}\n"
+
+    def _generar_imports_repositorio_json(self, nombres: NombresClase) -> str:
         return textwrap.dedent(
             f'''\
             """Implementación JSON del repositorio de {nombres.nombre_clase}."""
@@ -364,15 +379,25 @@ class CrudJsonBlueprint(Blueprint):
             from dominio.entidades.{nombres.nombre_snake} import {nombres.nombre_clase}
 
             LOGGER = logging.getLogger(__name__)
+            '''
+        )
 
-
+    def _generar_definicion_clase_repositorio_json(self, nombres: NombresClase) -> str:
+        return textwrap.dedent(
+            f'''\
             class Repositorio{nombres.nombre_clase}Json(Repositorio{nombres.nombre_clase}):
                 def __init__(self, ruta_base: str) -> None:
                     self._ruta_archivo = Path(ruta_base) / "datos" / "{nombres.nombre_plural}.json"
                     self._ruta_archivo.parent.mkdir(parents=True, exist_ok=True)
                     if not self._ruta_archivo.exists():
                         self._escribir_datos([])
+            '''
+        )
 
+    def _generar_metodo_guardar_json(self, nombres: NombresClase) -> str:
+        return self._indentar_bloque_clase(
+            textwrap.dedent(
+                f'''\
                 def crear(self, entidad: {nombres.nombre_clase}) -> {nombres.nombre_clase}:
                     datos = self._leer_datos()
                     nuevo_id = max((item.get("id", 0) for item in datos), default=0) + 1
@@ -381,16 +406,37 @@ class CrudJsonBlueprint(Blueprint):
                     self._escribir_datos(datos)
                     LOGGER.info("{nombres.nombre_clase} creada id=%s", nuevo_id)
                     return entidad_persistida
+                '''
+            )
+        )
 
+    def _generar_metodo_obtener_json(self, nombres: NombresClase) -> str:
+        return self._indentar_bloque_clase(
+            textwrap.dedent(
+                f'''\
                 def obtener_por_id(self, entidad_id: int) -> {nombres.nombre_clase}:
                     for item in self._leer_datos():
                         if item.get("id") == entidad_id:
                             return {nombres.nombre_clase}(**item)
                     raise ValueError("{nombres.nombre_clase} no encontrado")
+                '''
+            )
+        )
 
+    def _generar_metodo_listar_json(self, nombres: NombresClase) -> str:
+        return self._indentar_bloque_clase(
+            textwrap.dedent(
+                f'''\
                 def listar(self) -> list[{nombres.nombre_clase}]:
                     return [{nombres.nombre_clase}(**item) for item in self._leer_datos()]
+                '''
+            )
+        )
 
+    def _generar_metodo_actualizar_json(self, nombres: NombresClase) -> str:
+        return self._indentar_bloque_clase(
+            textwrap.dedent(
+                f'''\
                 def actualizar(self, entidad: {nombres.nombre_clase}) -> {nombres.nombre_clase}:
                     datos = self._leer_datos()
                     for indice, item in enumerate(datos):
@@ -400,7 +446,14 @@ class CrudJsonBlueprint(Blueprint):
                             LOGGER.info("{nombres.nombre_clase} actualizada id=%s", entidad.id)
                             return entidad
                     raise ValueError("{nombres.nombre_clase} no encontrado")
+                '''
+            )
+        )
 
+    def _generar_metodo_eliminar_json(self, nombres: NombresClase) -> str:
+        return self._indentar_bloque_clase(
+            textwrap.dedent(
+                f'''\
                 def eliminar(self, entidad_id: int) -> None:
                     datos = self._leer_datos()
                     filtrados = [item for item in datos if item.get("id") != entidad_id]
@@ -408,30 +461,41 @@ class CrudJsonBlueprint(Blueprint):
                         raise ValueError("{nombres.nombre_clase} no encontrado")
                     self._escribir_datos(filtrados)
                     LOGGER.info("{nombres.nombre_clase} eliminada id=%s", entidad_id)
-
-                def _leer_datos(self) -> list[dict]:
-                    contenido = self._ruta_archivo.read_text(encoding="utf-8").strip()
-                    if not contenido:
-                        return []
-                    return json.loads(contenido)
-
-                def _escribir_datos(self, datos: list[dict]) -> None:
-                    descriptor, ruta_tmp = tempfile.mkstemp(
-                        dir=str(self._ruta_archivo.parent),
-                        prefix=f".{{self._ruta_archivo.name}}.",
-                        suffix=".tmp",
-                    )
-                    ruta_tmp_path = Path(ruta_tmp)
-                    try:
-                        with open(descriptor, "w", encoding="utf-8", closefd=True) as archivo_tmp:
-                            json.dump(datos, archivo_tmp, ensure_ascii=False, indent=2)
-                            archivo_tmp.write("\\n")
-                        ruta_tmp_path.replace(self._ruta_archivo)
-                    finally:
-                        if ruta_tmp_path.exists():
-                            ruta_tmp_path.unlink()
-            '''
+                '''
+            )
         )
+
+    def _generar_utilidades_json(self) -> str:
+        bloque = "\n".join(
+            [
+                "def _leer_datos(self) -> list[dict]:",
+                '    contenido = self._ruta_archivo.read_text(encoding="utf-8").strip()',
+                "    if not contenido:",
+                "        return []",
+                "    return json.loads(contenido)",
+                "",
+                "def _escribir_datos(self, datos: list[dict]) -> None:",
+                "    descriptor, ruta_tmp = tempfile.mkstemp(",
+                "        dir=str(self._ruta_archivo.parent),",
+                '        prefix=f".{self._ruta_archivo.name}.",',
+                '        suffix=".tmp",',
+                "    )",
+                "    ruta_tmp_path = Path(ruta_tmp)",
+                "    try:",
+                '        with open(descriptor, "w", encoding="utf-8", closefd=True) as archivo_tmp:',
+                "            json.dump(datos, archivo_tmp, ensure_ascii=False, indent=2)",
+                '            archivo_tmp.write("\\n")',
+                "        ruta_tmp_path.replace(self._ruta_archivo)",
+                "    finally:",
+                "        if ruta_tmp_path.exists():",
+                "            ruta_tmp_path.unlink()",
+            ]
+        )
+        return self._indentar_bloque_clase(bloque)
+
+    def _indentar_bloque_clase(self, bloque: str) -> str:
+        bloque_normalizado = textwrap.dedent(bloque).lstrip("\n").rstrip()
+        return textwrap.indent(bloque_normalizado, "    ")
 
     def _contenido_test_crud(self, clase: EspecificacionClase, nombres: NombresClase) -> str:
         kwargs_crear = self._generar_kwargs_test(clase)

@@ -1,0 +1,79 @@
+"""Implementación JSON del repositorio de Producto."""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+import tempfile
+
+from aplicacion.puertos.repositorio_producto import RepositorioProducto
+from dominio.entidades.producto import Producto
+
+LOGGER = logging.getLogger(__name__)
+
+
+class RepositorioProductoJson(RepositorioProducto):
+    def __init__(self, ruta_base: str) -> None:
+        self._ruta_archivo = Path(ruta_base) / "datos" / "productos.json"
+        self._ruta_archivo.parent.mkdir(parents=True, exist_ok=True)
+        if not self._ruta_archivo.exists():
+            self._escribir_datos([])
+
+    def crear(self, entidad: Producto) -> Producto:
+        datos = self._leer_datos()
+        nuevo_id = max((item.get("id", 0) for item in datos), default=0) + 1
+        entidad_persistida = Producto(**{**entidad.__dict__, "id": nuevo_id})
+        datos.append(entidad_persistida.__dict__)
+        self._escribir_datos(datos)
+        LOGGER.info("Producto creada id=%s", nuevo_id)
+        return entidad_persistida
+
+    def obtener_por_id(self, entidad_id: int) -> Producto:
+        for item in self._leer_datos():
+            if item.get("id") == entidad_id:
+                return Producto(**item)
+        raise ValueError("Producto no encontrado")
+
+    def listar(self) -> list[Producto]:
+        return [Producto(**item) for item in self._leer_datos()]
+
+    def actualizar(self, entidad: Producto) -> Producto:
+        datos = self._leer_datos()
+        for indice, item in enumerate(datos):
+            if item.get("id") == entidad.id:
+                datos[indice] = entidad.__dict__
+                self._escribir_datos(datos)
+                LOGGER.info("Producto actualizada id=%s", entidad.id)
+                return entidad
+        raise ValueError("Producto no encontrado")
+
+    def eliminar(self, entidad_id: int) -> None:
+        datos = self._leer_datos()
+        filtrados = [item for item in datos if item.get("id") != entidad_id]
+        if len(filtrados) == len(datos):
+            raise ValueError("Producto no encontrado")
+        self._escribir_datos(filtrados)
+        LOGGER.info("Producto eliminada id=%s", entidad_id)
+
+    def _leer_datos(self) -> list[dict]:
+        contenido = self._ruta_archivo.read_text(encoding="utf-8").strip()
+        if not contenido:
+            return []
+        return json.loads(contenido)
+
+    def _escribir_datos(self, datos: list[dict]) -> None:
+        descriptor, ruta_tmp = tempfile.mkstemp(
+            dir=str(self._ruta_archivo.parent),
+            prefix=f".{self._ruta_archivo.name}.",
+            suffix=".tmp",
+        )
+        ruta_tmp_path = Path(ruta_tmp)
+        try:
+            with open(descriptor, "w", encoding="utf-8", closefd=True) as archivo_tmp:
+                json.dump(datos, archivo_tmp, ensure_ascii=False, indent=2)
+                archivo_tmp.write("\n")
+            ruta_tmp_path.replace(self._ruta_archivo)
+        finally:
+            if ruta_tmp_path.exists():
+                ruta_tmp_path.unlink()
